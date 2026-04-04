@@ -1,0 +1,57 @@
+{
+  "server": {
+    "version": "1.21.1",
+    "host": "jackal.openrealm.cn",
+    "port": 25565
+  },
+  "player": {
+    "username": "Lzdqesj_bot1",
+    "owner": "Lzdqesj_"
+  },
+  "accounts": [
+    {
+      "username": "Lzdqesj_bot1",
+      "owner": "Lzdqesj_"
+    }
+  ],
+  "currentAccountIndex": 0,
+  "auth": {
+    "autoLogin": true,
+    "autoRegister": true,
+    "password": "lzd112233",
+    "loginCommand": "/login",
+    "registerCommand": "/register"
+  },
+  "reconnect": {
+    "enabled": true,
+    "maxReconnectAttempts": 114514,
+    "reconnectDelay": 5000
+  },
+  "playerCheckInterval": 10000,
+  "playerAlerts": {
+    "Lzdqesj_": {
+      "message": "欢迎主人 Lzdqesj_ 上线！",
+      "leaveMessage": "主人 Lzdqesj_ 下线了。本 Bot 将持续挂机。",
+      "command": "/minecraft:tell Lzdqesj_ 机器人已登录完成！",
+      "delay": 2000}
+  },
+  "openai": {
+    "apiUrl": "https://openrouter.ai/api/v1/chat/completions",
+    "model": "qwen/qwen3-4b:free",
+    "apiKey": "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"
+  },
+  "signin": {
+    "enabled": true,
+    "command": "/signin"
+  },
+  "startupCommands": [
+    "/login lzd112233",
+    "[StarBotMC] 自动登录完成。正在尝试签到 ...",
+    "/signin click",
+    "[StarBotMC] 自动签到完成, 正在尝试将 10.00JSC 转账给主人 Lzdqesj_ ...",
+    "/money pay Lzdqesj_ 10"
+  ],
+  "web": {
+    "password": "admin123"
+  }
+}

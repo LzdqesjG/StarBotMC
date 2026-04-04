@@ -1,0 +1,59 @@
+{
+  "server": {
+    "version": "1.21.1",
+    "host": "example.com",
+    "port": 25565
+  },
+  "player": {
+    "username": "YourBotName",
+    "owner": "YourUsername"
+  },
+  "accounts": [
+    {
+      "username": "Bot1",
+      "owner": "YourUsername"
+    },
+    {
+      "username": "Bot2",
+      "owner": "YourUsername"
+    }
+  ],
+  "currentAccountIndex": 0,
+  "auth": {
+    "autoLogin": true,
+    "autoRegister": true,
+    "password": "your_password_here",
+    "loginCommand": "/login",
+    "registerCommand": "/register"
+  },
+  "reconnect": {
+    "enabled": true,
+    "maxReconnectAttempts": 10,
+    "reconnectDelay": 5000
+  },
+  "playerCheckInterval": 10000,
+  "playerAlerts": {
+    "YourUsername": {
+      "message": "欢迎主人上线！",
+      "leaveMessage": "再见！",
+      "command": "/tell YourUsername 我在线了！",
+      "delay": 2000
+    }
+  },
+  "openai": {
+    "apiUrl": "https://api.openai.com/v1/chat/completions",
+    "model": "gpt-3.5-turbo",
+    "apiKey": "your_api_key_here"
+  },
+  "signin": {
+    "enabled": true,
+    "command": "/signin"
+  },
+  "startupCommands": [
+    "/login your_password_here",
+    "/signin"
+  ],
+  "web": {
+    "password": "your_web_password_here"
+  }
+}
