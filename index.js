@@ -523,6 +523,7 @@ function setupBotEvents() {
   // 死亡事件
   bot.on('death', () => {
     console.log('Bot死亡了，正在重生...');
+    bot.chat("/home")
   });
 
   // 服务器消息事件（捕捉所有服务器发送的消息）
@@ -965,6 +966,7 @@ function updatePlayerList() {
   // 检查连接状态
   if (!isConnected) {
     console.log('Bot已断开连接，跳过玩家列表更新');
+    reconnectManager.reconnectNow();
     return;
   }
   
