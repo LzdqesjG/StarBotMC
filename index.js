@@ -27,6 +27,64 @@ app.use(express.static('public'));
 // 密码验证
 const authenticatedSockets = new Set();
 
+// 日志记录到文件
+const now = new Date();
+const dateStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
+
+// 确保logs目录存在
+const logsDir = './logs';
+if (!fs.existsSync(logsDir)) {
+  fs.mkdirSync(logsDir, { recursive: true });
+}
+
+// 获取今日启动次序
+const logFiles = fs.readdirSync(logsDir).filter(f => f.startsWith(dateStr));
+const sequenceNumber = logFiles.length + 1;
+
+const logFileName = `${logsDir}/${dateStr}_${sequenceNumber}.log`;
+const logStream = fs.createWriteStream(logFileName, { flags: 'a' });
+
+// 重定向console.log到文件和控制台
+const originalLog = console.log;
+console.log = function(...args) {
+  originalLog.apply(console, args);
+  const logMessage = args.map(arg => 
+    typeof arg === 'object' ? JSON.stringify(arg) : String(arg)
+  ).join(' ') + '\n';
+  const now = new Date();
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  const seconds = String(now.getSeconds()).padStart(2, '0');
+  const milliseconds = String(now.getMilliseconds()).padStart(2, '0');
+  logStream.write(`[${hours}:${minutes}:${seconds}.${milliseconds}] ${logMessage}`);
+};
+
+starbotmc_version = '1.0.0000';
+starcore_version = '1.0.0000';
+starbot_version = mineflayer.version;
+
+console.log(`[StarBotMC] 当前版本: ${starbotmc_version}`)
+console.log(`[StarCore]  当前版本: ${starcore_version}`)
+console.log(`[StarBot]   当前版本: ${starbot_version}`)
+
+console.log('日志系统已加载完毕。')
+console.log(`本次运行日志文件: ${logFileName}`);
+
+const asciiArt = `
+[StarBotMC] 正在执行 StarCore 初始化 ...
+ /==========================================================================================\\
+|      ███████╗████████╗ █████╗ ██████╗ ██████╗  ██████╗ ████████╗    ███╗   ███╗ ██████╗    |
+|      ██╔════╝╚══██╔══╝██╔══██╗██╔══██╗██╔══██╗██╔═══██╗╚══██╔══╝    ████╗ ████║██╔════╝    |
+|      ███████╗   ██║   ███████║██████╔╝██████╔╝██║   ██║   ██║       ██╔████╔██║██║         |
+|      ╚════██║   ██║   ██╔══██║██╔══██╗██╔══██╗██║   ██║   ██║       ██║╚██╔╝██║██║         |
+|      ███████║   ██║   ██║  ██║██║  ██║██████╔╝╚██████╔╝   ██║       ██║ ╚═╝ ██║╚██████╗    |
+|      ╚══════╝   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝  ╚═════╝    ╚═╝       ╚═╝     ╚═╝ ╚═════╝    |
+ \\==========================================================================================/
+[StarBotMC] StarCore 初始化完成。正在初始化 StarBot ...
+`;
+
+console.log(asciiArt);
+
 io.on('connection', (socket) => {
   console.log('[WebUI] 网页客户端已连接');
   
