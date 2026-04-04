@@ -12,8 +12,9 @@ const AuthManager = require('./auth');
 const PlayerTracker = require('./playerTracker');
 const ReconnectManager = require('./reconnect');
 
-// 读取配置文件
-const config = JSON.parse(fs.readFileSync('config.json', 'utf8'));
+// 读取配置文件 若包含 --test 参数则使用测试配置
+const configFile = process.argv.includes('--test') ? 'test.config.json' : 'config.json';
+const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
 
 // 创建Express应用
 const app = express();
@@ -27,24 +28,24 @@ app.use(express.static('public'));
 const authenticatedSockets = new Set();
 
 io.on('connection', (socket) => {
-  console.log('网页客户端已连接');
+  console.log('[WebUI] 网页客户端已连接');
   
   // 处理登录请求
   socket.on('login', (password) => {
     if (password === config.web.password) {
       authenticatedSockets.add(socket.id);
       socket.emit('login_result', { success: true });
-      console.log('用户登录成功');
+      console.log('[WebUI] 用户登录成功');
     } else {
       socket.emit('login_result', { success: false, message: '密码错误' });
-      console.log('用户登录失败：密码错误');
+      console.log('[WebUI] 用户登录失败：密码错误');
     }
   });
   
   // 处理断开连接
   socket.on('disconnect', () => {
     authenticatedSockets.delete(socket.id);
-    console.log('网页客户端已断开连接');
+    console.log('[WebUI] 网页客户端已断开连接');
   });
   
   // 检查是否已认证
@@ -59,33 +60,11 @@ io.on('connection', (socket) => {
       return;
     }
     
-    console.log(`网页发送消息: ${message}`);
+    console.log(`[WebUI] 网页发送消息: ${message}`);
     if (bot) {
       // 检查是否是命令
       if (message.startsWith('.')) {
-        const command = message.split(' ')[0].toLowerCase();
-        
-        switch (command) {
-          case '.help':
-            showHelp();
-            break;
-          case '.dc':
-            disconnectBot();
-            break;
-          case '.drop':
-            const args = message.split(' ').slice(1);
-            if (args.length > 0) {
-              const slot = parseInt(args[0]);
-              const count = args.length > 1 ? parseInt(args[1]) : undefined;
-              dropItem(slot, count);
-            } else {
-              dropAllItems();
-            }
-            break;
-          default:
-            bot.chat(message);
-            break;
-        }
+        webCmd(message);
       } else {
         bot.chat(message);
       }
@@ -98,7 +77,7 @@ io.on('connection', (socket) => {
 // 启动Web服务器
 const PORT = 3000;
 server.listen(PORT, () => {
-  console.log(`Web服务器已启动，访问地址: http://localhost:${PORT}`);
+  console.log('[WebUI] Web服务器已启动，访问地址: http://localhost:${PORT}');
 });
 
 // OpenAI API调用函数
@@ -166,7 +145,7 @@ function dropAllItems() {
   }
   
   console.log(`开始丢弃 ${items.length} 个物品...`);
-  bot.chat(`开始丢弃 ${items.length} 个物品...`);
+  bot.chat(`[StarBotMC] 开始丢弃 ${items.length} 个物品...`);
   
   let dropCount = 0;
   let index = 0;
@@ -175,7 +154,7 @@ function dropAllItems() {
   function dropNextItem() {
     if (index >= items.length) {
       console.log(`已丢弃所有物品，共 ${dropCount} 个`);
-      bot.chat(`已丢弃所有物品，共 ${dropCount} 个`);
+      bot.chat(`[StarBotMC] 已丢弃所有物品，共 ${dropCount} 个`);
       return;
     }
     
@@ -202,7 +181,7 @@ function dropAllItems() {
 }
 
 // 显示帮助信息
-function showHelp() {
+function showHelp(whisper) {
   const helpMessage = `
 可用命令:
 .help - 显示此帮助信息
@@ -212,14 +191,23 @@ function showHelp() {
 .drop <栏位> <数量> - 丢弃指定栏位的指定数量物品
 `;
   console.log(helpMessage);
-  if (bot) {
-    bot.chat('帮助信息已显示在控制台');
-  }
+  // if (bot) {
+  //   bot.chat('帮助信息已显示在控制台');
+  // }
   // 发送帮助信息到网页
   io.emit('chat_message', {
-    username: '系统',
+    username: 'StarBotMC',
     message: helpMessage
   });
+  if (whisper) {
+    bot.chat(`/minecraft:tell {config.player.owner} 正在准备发送帮助消息, 一秒一条`);
+    let lines = helpMessage.split('\n');
+    lines.forEach((line, index) => {
+      setTimeout(() => {
+        bot.chat(`/minecraft:tell ${config.player.owner} ${line}`);
+      }, 1000 * index);
+    });
+  }
 }
 
 // 断开机器人连接
@@ -242,7 +230,7 @@ function dropItem(slot, count) {
   
   if (!item) {
     console.log(`栏位 ${slot} 中没有物品`);
-    bot.chat(`栏位 ${slot} 中没有物品`);
+    bot.chat(`[StarBotMC] 栏位 ${slot} 中没有物品`);
     return;
   }
   
@@ -250,19 +238,19 @@ function dropItem(slot, count) {
     // 丢弃整个物品堆
     bot.tossStack(item).then(() => {
       console.log(`已丢弃栏位 ${slot} 的 ${item.name} x${item.count}`);
-      bot.chat(`已丢弃栏位 ${slot} 的 ${item.name} x${item.count}`);
+      bot.chat(`[StarBotMC] 已丢弃栏位 ${slot} 的 ${item.name} x${item.count}`);
     }).catch((err) => {
       console.error(`丢弃物品失败:`, err.message);
-      bot.chat(`丢弃物品失败: ${err.message}`);
+      bot.chat(`[StarBotMC] 丢弃物品失败: ${err.message}`);
     });
   } else {
     // 丢弃指定数量
     bot.toss(item.type, null, count).then(() => {
       console.log(`已丢弃栏位 ${slot} 的 ${item.name} x${count}`);
-      bot.chat(`已丢弃栏位 ${slot} 的 ${item.name} x${count}`);
+      bot.chat(`[StarBotMC] 已丢弃栏位 ${slot} 的 ${item.name} x${count}`);
     }).catch((err) => {
       console.error(`丢弃物品失败:`, err.message);
-      bot.chat(`丢弃物品失败: ${err.message}`);
+      bot.chat(`[StarBotMC] 丢弃物品失败: ${err.message}`);
     });
   }
 }
@@ -295,6 +283,60 @@ function createBot() {
   setupBotEvents();
 
   return bot;
+}
+
+function webCmd(message, whisper) {
+  if (whisper !== true) {
+    whisper = false;
+  }
+  const command = message.split(' ')[0].toLowerCase();
+        
+  switch (command) {
+    case '.help':
+      showHelp(whisper);
+      return 1;
+    case '.dc':
+      disconnectBot();
+      return 1;
+    case '.drop':
+      const argsdrop = message.split(' ').slice(1);
+      if (argsdrop.length > 0) {
+        const slot = parseInt(argsdrop[0]);
+        const count = argsdrop.length > 1 ? parseInt(argsdrop[1]) : undefined;
+        dropItem(slot, count);
+      } else {
+        dropAllItems();
+      }
+      return 1;
+    case '.say':
+      const argssay = message.split(' ').slice(1);
+      if (argssay.length > 0) {
+        bot.chat(argssay.join(' '));
+      }
+      return 1;
+    default:
+      io.emit('chat_message', {
+        username: 'StarBotMC',
+        message: `未知命令: ${message}`
+      });
+      io.emit('chat_message', {
+        username: 'StarBotMC',
+        message: `发送"."开头的消息请使用".say <消息>"命令。`
+      });
+      bot.chat(`/minecraft:tell ${config.player.owner} 未知命令: ${message}`);
+      setTimeout(() => {
+        bot.chat(`/minecraft:tell ${config.player.owner} 发送"."开头的消息请使用".say <消息>"命令。`);
+      }, 1000);
+      return true;
+  }
+}
+
+function whisperCmd(message) {
+  if (bot) {
+    if (!webCmd(message, true)) {
+      bot.chat(`[StarBotMC] 收到主人私信 >>> ${message}`);
+    }
+  }
 }
 
 // 设置bot事件
@@ -342,8 +384,8 @@ function setupBotEvents() {
           console.log(`执行命令: ${command}`);
           bot.chat(command);
           index++;
-          // 延迟3秒执行下一个命令，避免触发服务器防刷屏机制
-          setTimeout(executeNextCommand, 3000);
+          // 延迟1秒执行下一个命令，避免触发服务器防刷屏机制
+          setTimeout(executeNextCommand, 1500);
         } else {
           console.log('启动命令序列执行完成');
         }
@@ -406,25 +448,25 @@ function setupBotEvents() {
           case 'follow':
             isFollowing = true;
             followTarget = username;
-            bot.chat(`开始跟随 ${username}`);
+            bot.chat(`[StarBotMC] 开始跟随 ${username}`);
             io.emit('chat_message', { username: bot.username, message: `开始跟随 ${username}` });
             startFollowing();
             break;
           case 'stop':
             isFollowing = false;
             followTarget = null;
-            bot.chat('已停止跟随');
+            bot.chat('[StarBotMC] 已停止跟随');
             io.emit('chat_message', { username: bot.username, message: '已停止跟随' });
             break;
           case 'ai':
-            bot.chat('AI功能已启用');
+            bot.chat('[StarBotMC] AI功能已启用');
             io.emit('chat_message', { username: bot.username, message: 'AI功能已启用' });
             break;
           case 'switch':
             // 切换账户
             const nextAccount = accountManager.switchToNextAccount();
             if (nextAccount) {
-              bot.chat(`正在切换到账户: ${nextAccount.username}`);
+              bot.chat(`[StarBotMC] 正在切换到账户: ${nextAccount.username}`);
               setTimeout(() => {
                 createBot();
               }, 2000);
@@ -433,14 +475,14 @@ function setupBotEvents() {
           case 'accounts':
             // 列出所有账户
             const accounts = accountManager.listAccounts();
-            bot.chat(`共有 ${accounts.length} 个账户`);
+            bot.chat(`[StarBotMC] 共有 ${accounts.length} 个账户`);
             break;
           default:
-            bot.chat(`未知命令: !${command}`);
+            bot.chat(`[StarBotMC] 未知命令: !${command}`);
             io.emit('chat_message', { username: bot.username, message: `未知命令: !${command}` });
         }
       } else {
-        bot.chat('只有所有者可以执行命令');
+        bot.chat('[StarBotMC] 只有所有者可以执行命令');
         io.emit('chat_message', { username: bot.username, message: '只有所有者可以执行命令' });
       }
     }
@@ -505,10 +547,31 @@ function setupBotEvents() {
           name: sender.name || sender.displayName
         };
       } else if (sender.type === 'system') {
-        senderInfo = '系统';
-        senderDetails = {
-          type: 'system'
-        };
+        // 检测私聊消息格式: "xxx whisper to you: 消息"
+        const whisperMatch = messageStr.match(/^(.*?) whispers to you: (.*)$/i);
+        if (whisperMatch) {
+          senderInfo = whisperMatch[1];
+          senderDetails = {
+            type: 'whisper',
+            name: whisperMatch[1],
+            message: whisperMatch[2]
+          };
+        } else if (messageStr.includes('whisper to')) {
+          // 其他形式的私聊消息
+          const whisperMatch2 = messageStr.match(/You whispers to (.*?): (.*)/i);
+          if (whisperMatch2) {
+            senderInfo = `我 -> ${whisperMatch2[1]}`;
+            senderDetails = {
+              type: 'whisper_sent (发送私信)',
+              recipient: whisperMatch2[1],
+              message: whisperMatch2[2]
+            };
+          }
+        }
+        // senderInfo = '系统';
+        // senderDetails = {
+        //   type: 'system'
+        // };
       } else if (sender.username) {
         senderInfo = sender.username;
         senderDetails = {
@@ -555,9 +618,9 @@ function setupBotEvents() {
         // 其他形式的私聊消息
         const whisperMatch2 = messageStr.match(/You whispers to (.*?): (.*)/i);
         if (whisperMatch2) {
-          senderInfo = '我';
+          senderInfo = `我 -> ${whisperMatch2[1]}`;
           senderDetails = {
-            type: 'whisper_sent',
+            type: 'whisper_sent (发送私信)',
             recipient: whisperMatch2[1],
             message: whisperMatch2[2]
           };
@@ -596,6 +659,30 @@ function setupBotEvents() {
     let senderInfo = '系统';
     let senderDetails = null;
     
+    messageStr = message.toString();
+
+    // 检测私聊消息格式: "xxx whisper to you: 消息"
+    const whisperMatch = messageStr.match(/^(.*?) whispers to you: (.*)$/i);
+    if (whisperMatch) {
+      senderInfo = whisperMatch[1];
+      senderDetails = {
+        type: 'whisper',
+        name: whisperMatch[1],
+        message: whisperMatch[2]
+      };
+    } else if (messageStr.includes('whisper to')) {
+      // 其他形式的私聊消息
+      const whisperMatch2 = messageStr.match(/You whispers to (.*?): (.*)/i);
+      if (whisperMatch2) {
+        senderInfo = `我 -> ${whisperMatch2[1]}`;
+        senderDetails = {
+          type: 'whisper_sent (发送私信)',
+          recipient: whisperMatch2[1],
+          message: whisperMatch2[2]
+        };
+      }
+    }
+
     if (sender) {
       // 如果有发送者信息
       if (sender.type === 'player') {
@@ -692,10 +779,10 @@ function setupBotEvents() {
         // 其他形式的私聊消息
         const whisperMatch2 = messageStr.match(/You whisper(s)? to (.*?): (.*)/i);
         if (whisperMatch2) {
-          senderInfo = '我';
+          senderInfo = `我 -> ${whisperMatch2[1]}`;
           senderDetails = {
-            type: 'whisper_sent',
-            recipient: whisperMatch2[2],
+            type: 'whisper_sent (发送私信)',
+            recipient: whisperMatch2[1],
             message: whisperMatch2[3]
           };
         }
@@ -778,7 +865,41 @@ function setupBotEvents() {
   bot.on('messagestr', (message) => {
     if (message === '.github') {
       bot.chat('https://github.com/LzdqesjG/StarBotMC/');
+      setTimeout(() =>{
+        bot.chat('记得点个 Star ~');
+      }, 1000)
     }
+
+    //检测私聊消息格式: "xxx whisper to you: 消息"
+    const whisperMatch = message.match(/^(.*?) whispers to you: (.*)$/i);
+    if (whisperMatch) {
+      // 发送到网页界面
+      io.emit('chat_message', {
+        username: `${whisperMatch[1]} to 我`,
+        message: whisperMatch[2],
+        senderDetails: {
+          type: 'whisper (收到私信)'
+        }
+      });
+      if (whisperMatch[1] === config.player.owner) {
+        whisperCmd(whisperMatch[2])
+      }
+      return;
+    } else if (message.includes('whisper to')) {
+      // 其他形式的私聊消息
+      const whisperMatch2 = message.match(/You whispers to (.*?): (.*)/i);
+      if (whisperMatch2) {
+        // 发送到网页界面
+        io.emit('chat_message', {
+          username: `我 -> ${whisperMatch2[1]}`,
+          message: whisperMatch2[2],
+          senderDetails: {
+            type: 'whisper_sent (发送私信)'
+          }
+        });return;
+      }
+    }
+
     console.log(`消息字符串: ${message}`);
     
     // 发送到网页界面
@@ -786,7 +907,7 @@ function setupBotEvents() {
       username: '系统',
       message: message,
       senderDetails: {
-        type: 'string'
+        type: 'string (消息字符串)'
       }
     });
   });
