@@ -48,11 +48,10 @@
     "/login lzd112233",
     "[StarBotMC] 自动登录完成。正在尝试签到 ...",
     "/signin click",
-    "[StarBotMC] 自动签到完成, 正在尝试将 10.00JSC 转账给主人 Lzdqesj_ ...",
     "/money pay Lzdqesj_ 10",
-    "[StarBotMC] 转账完成。获取同款挂机Bot请发送消息\".github\""
+    "[StarBotMC] 自动签到完成。获取同款挂机 Bot 请发送消息\".github\""
   ],
   "web": {
-    "password": "admin123"
+    "password": "admin"
   }
 }

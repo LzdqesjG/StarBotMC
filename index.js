@@ -776,6 +776,9 @@ function setupBotEvents() {
 
   // 消息字符串事件
   bot.on('messagestr', (message) => {
+    if (message === '.github') {
+      bot.chat('https://github.com/LzdqesjG/StarBotMC/');
+    }
     console.log(`消息字符串: ${message}`);
     
     // 发送到网页界面
@@ -791,6 +794,15 @@ function setupBotEvents() {
   // 聊天事件（另一种格式）
   bot.on('chat', (username, message, messageType, rawMessage, messageObject) => {
     console.log(`聊天 [${username}]: ${message} (类型: ${messageType})`);
+    
+    // // 检测是否是其他玩家发送的 ".github" 消息
+    // if (message === '.github' && username !== bot.username) {
+    //   console.log(`检测到玩家 ${username} 请求 GitHub 链接`);
+    //   setTimeout(() => {
+    //     bot.chat('https://github.com/LzdqesjG/StarBotMC/');
+    //     console.log('已发送 GitHub 链接');
+    //   }, 500);
+    // }
     
     // 发送到网页界面
     io.emit('chat_message', {
