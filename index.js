@@ -231,7 +231,7 @@ if (config.web.host ? config.web.host : -1 === -1) {
 const PORT = config.web.port ? config.web.port : 3081;
 const HOST = config.web.host ? config.web.host : '0.0.0.0';
 server.listen(PORT, HOST, () => {
-  console.log(`[WebUI] Web服务器已启动，访问地址: http://${HOST}:${PORT}`);
+  console.log(`[WebUI] Web服务器已启动，访问地址: http://127.0.0.1:${PORT}`);
 });
 
 // OpenAI API调用函数
