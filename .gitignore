@@ -1,6 +1,7 @@
 # test files
 test.config.json
-
+# config files
+config.json
 # Logs
 logs
 *.log
