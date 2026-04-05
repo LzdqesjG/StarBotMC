@@ -1,12 +1,12 @@
 {
   "server": {
-    "version": "1.21.11",                  #这里填游戏版本号
-    "host": "jackal.wormwake.com",         #这里填服务器地址
-    "port": 25565                          #这里填服务器端口
+    "version": "1.21.11",                  
+    "host": "jackal.wormwake.com",        
+    "port": 25565                          
   },
   "player": {
-    "username": "YourBotName",             #这里填Bot名称
-    "owner": "YourUsername"                #这里填你的主号用户名
+    "username": "YourBotName",         
+    "owner": "YourUsername"            
   },
   "accounts": [
     {
@@ -20,11 +20,11 @@
   ],
   "currentAccountIndex": 0,
   "auth": {
-    "autoLogin": true,                    #如果您还没有注册，请先暂时改为false
-    "autoRegister": true,                 #如果您已经注册，请将它更改为false
-    "password": "your_password_here",     #填写您的密码
-    "loginCommand": "/login",             #根据服务器的情况更改，默认情况下无需更改
-    "registerCommand": "/register"        #根据服务器的情况更改，默认情况下无需更改
+    "autoLogin": true,                   
+    "autoRegister": true,                 
+    "password": "your_password_here",   
+    "loginCommand": "/login",         
+    "registerCommand": "/register"       
   },
   "reconnect": {
     "enabled": true,
@@ -34,23 +34,23 @@
   "playerCheckInterval": 10000,
   "playerAlerts": {
     "YourUsername": {
-      "message": "欢迎主人上线！",          #你上线时发现的消息
-      "leaveMessage": "再见！",            #你下线时发送的消息
-      "command": "/tell YourUsername 我在线了！",#把 YourUsername改成你的用户名
+      "message": "欢迎主人上线！",    
+      "leaveMessage": "再见！",         
+      "command": "/tell YourUsername 我在线了！",
       "delay": 2000
     }
   },
   "openai": {
     "apiUrl": "https://api.openai.com/v1/chat/completions",
     "model": "gpt-3.5-turbo",
-    "apiKey": "your_api_key_here"        #AI的API密钥
+    "apiKey": "your_api_key_here"
   },
   "signin": {
     "enabled": true,
     "command": "/signin"
   },
   "startupCommands": [
-    "/login your_password_here",         #自动发送的文本
+    "/login your_password_here",
     "/signin"
   ],
   "web": {
