@@ -17,6 +17,40 @@ const ReconnectManager = require('./reconnect');
 const configFile = testmode ? 'test.config.json' : 'config.json';
 const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
 
+// 用户消息记录，用于限频
+const userMessageRecords = {};
+
+// 计算字符串相似度（Levenshtein距离）
+function calculateSimilarity(str1, str2) {
+  const len1 = str1.length;
+  const len2 = str2.length;
+  const matrix = [];
+  
+  for (let i = 0; i <= len2; i++) {
+    matrix[i] = [i];
+  }
+  for (let j = 0; j <= len1; j++) {
+    matrix[0][j] = j;
+  }
+  
+  for (let i = 1; i <= len2; i++) {
+    for (let j = 1; j <= len1; j++) {
+      if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j] + 1
+        );
+      }
+    }
+  }
+  
+  const maxLen = Math.max(len1, len2);
+  return 1 - (matrix[len2][len1] / maxLen);
+}
+
 // 创建Express应用
 const app = express();
 const server = http.createServer(app);
@@ -458,15 +492,19 @@ function webCmd(message, whisper=false, sender='') {
       } else {bot.chat(`/minecraft:tell ${sender} 你没有权限！}`);}
     case '.dc':
       if (isOwner) {
+        bot.chat('[StarBotMC] 主人手动操作断开连接 (自动重连)。');
         disconnectBot();
         return 1;
       } else {bot.chat(`/minecraft:tell ${sender} 你没有权限！}`);}
     case '.rc':
-      reconnectManager.reconnectNow();
-      return 1;
+      if (isOwner) {
+        bot.chat('[StarBotMC] 主人手动操作重新连接。');
+        reconnectManager.reconnectNow();
+        return 1;
+      } else {bot.chat(`/minecraft:tell ${sender} 你没有权限！}`);}
     case '.stop':
       if (isOwner) {
-        bot.chat('[StarBotMC] 主人手动关闭机器人，再见！');
+        bot.chat('[StarBotMC] 主人手动关闭机器人。');
         setTimeout(() => {
           reconnectManager.disableReconnect();
           disconnectBot();
@@ -496,7 +534,7 @@ function webCmd(message, whisper=false, sender='') {
         return 1;
       } else {bot.chat(`/minecraft:tell ${sender} 你没有权限！}`);}
     default:
-      if (isOwner) {
+      if (isOwner && command.startsWith('.')) {
         io.emit('chat_message', {
           username: `StarBotMC -> ${sender}`,
           message: `未知命令: ${message}`
@@ -505,12 +543,10 @@ function webCmd(message, whisper=false, sender='') {
           username: `StarBotMC -> ${sender}`,
           message: `发送"."开头的消息请使用".say <消息>"命令。`
         });
-        if (command.startsWith('.')) {
-            bot.chat(`/minecraft:tell ${config.player.owner} 未知命令: ${message}`);
-          setTimeout(() => {
-            bot.chat(`/minecraft:tell ${config.player.owner} 发送"."开头的消息请使用".say <消息>"命令。`);
-          }, 1000);
-        };
+        bot.chat(`/minecraft:tell ${config.player.owner} 未知命令: ${message}`);
+        setTimeout(() => {
+          bot.chat(`/minecraft:tell ${config.player.owner} 发送"."开头的消息请使用".say <消息>"命令。`);
+        }, 1000);
         return false;
       } else {console.log(`[私信] ${sender} >>> ${message}`);return false;}
   }
@@ -1067,13 +1103,6 @@ function setupBotEvents() {
 
   // 消息字符串事件
   bot.on('messagestr', (message) => {
-    if (message === '.github') {
-      bot.chat('https://github.com/LzdqesjG/StarBotMC/');
-      setTimeout(() =>{
-        bot.chat('记得点个 Star ~');
-      }, 1000)
-    }
-
     //检测私聊消息格式: "xxx whisper to you: 消息"
     const whisperMatch = message.match(/^(.*?) whispers to you: (.*)$/i);
     if (whisperMatch) {
@@ -1116,16 +1145,49 @@ function setupBotEvents() {
 
   // 聊天事件（另一种格式）
   bot.on('chat', (username, message, messageType, rawMessage, messageObject) => {
+    if (username === bot.username) return;
+    
     console.log(`聊天 [${username}]: ${message} (类型: ${messageType})`);
     
-    // // 检测是否是其他玩家发送的 ".github" 消息
-    // if (message === '.github' && username !== bot.username) {
-    //   console.log(`检测到玩家 ${username} 请求 GitHub 链接`);
-    //   setTimeout(() => {
-    //     bot.chat('https://github.com/LzdqesjG/StarBotMC/');
-    //     console.log('已发送 GitHub 链接');
-    //   }, 500);
-    // }
+    // 检查是否是主人
+    const isOwner = username === config.player.owner;
+    
+    // 非主人消息限频检查
+    if (!isOwner && config.messageLimit && config.messageLimit.enabled) {
+      const now = Date.now();
+      const cooldown = config.messageLimit.cooldown * 1000;
+      const threshold = config.messageLimit.similarityThreshold;
+      
+      if (!userMessageRecords[username]) {
+        userMessageRecords[username] = [];
+      }
+      
+      // 清理过期记录
+      userMessageRecords[username] = userMessageRecords[username].filter(record => {
+        return now - record.timestamp < cooldown;
+      });
+      
+      // 检查相似度
+      for (const record of userMessageRecords[username]) {
+        const similarity = calculateSimilarity(message, record.message);
+        if (similarity >= threshold) {
+          console.log(`[限频] 忽略 ${username} 的重复消息: ${message}`);
+          return;
+        }
+      }
+      
+      // 记录新消息
+      userMessageRecords[username].push({ message, timestamp: now });
+    }
+    
+    // 检测是否是其他玩家发送的 ".github" 消息
+    if (message === '.github' && username !== bot.username) {
+      console.log(`检测到玩家 ${username} 请求 GitHub 链接`);
+      bot.chat('https://github.com/LzdqesjG/StarBotMC/');
+      setTimeout(() => {
+        bot.chat('记得点个 Star ~');
+      }, 1000);
+    }
     
     // 发送到网页界面
     io.emit('chat_message', {
