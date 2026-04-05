@@ -63,6 +63,8 @@ copy config_template.json config.json
 
 编辑 `config.json` 文件，填入你的配置信息。
 
+请一定要更改配置文件，否则无法使用
+
 ### 4. 启动机器人
 
 Windows:
