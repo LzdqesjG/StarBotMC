@@ -5,14 +5,14 @@
 
   <p><em>StarBotMC 是一个功能强大的的 Minecraft AI 机器人，支持多账户管理、自动登录、玩家追踪、Web 控制面板和 AI 聊天功能。</em></p>
 
-  <img src="https://goreportcard.com/badge/github.com/LzdqesjG/StarBotMC" alt="latest version" />
+  <!-- <img src="https://goreportcard.com/badge/github.com/LzdqesjG/StarBotMC" alt="latest version" /> -->
   <a href="https://github.com/LzdqesjG/StarBotMC/blob/main/LICENSE"><img src="https://img.shields.io/github/license/LzdqesjG/StarBotMC" alt="License" /></a>
-  <a href="https://github.com/LzdqesjG/StarBotMC/actions?query=workflow%3ABuild"><img src="https://img.shields.io/github/actions/workflow/status/LzdqesjG/StarBotMC/build.yml?branch=main" alt="Build status" /></a>
+  <!-- <a href="https://github.com/LzdqesjG/StarBotMC/actions?query=workflow%3ABuild"><img src="https://img.shields.io/github/actions/workflow/status/LzdqesjG/StarBotMC/build.yml?branch=main" alt="Build status" /></a> -->
   <a href="https://github.com/LzdqesjG/StarBotMC/releases"><img src="https://img.shields.io/github/release/LzdqesjG/StarBotMC" alt="latest version" /></a>
 
   <a href="https://github.com/LzdqesjG/StarBotMC/discussions"><img src="https://img.shields.io/github/discussions/LzdqesjG/StarBotMC?color=%23ED8936" alt="discussions" /></a>
-  <a href="https://github.com/LzdqesjG/StarBotMC/releases"><img src="https://img.shields.io/github/downloads/LzdqesjG__':
-/total?color=%239F7AEA&logo=github" alt="Downloads" /></a>
+  <!-- <a href="https://github.com/LzdqesjG/StarBotMC/releases"><img src="https://img.shields.io/github/downloads/LzdqesjG__':
+/total?color=%239F7AEA&logo=github" alt="Downloads" /></a> -->
 </div>
 
 

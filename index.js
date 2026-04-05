@@ -61,7 +61,7 @@ console.log = function(...args) {
 
 starbotmc_version = '1.0.0000';
 starcore_version = '1.0.0000';
-starbot_version = mineflayer.version;
+starbot_version = '4.35.0';
 
 console.log(`[StarBotMC] 当前版本: ${starbotmc_version}`)
 console.log(`[StarCore]  当前版本: ${starcore_version}`)
