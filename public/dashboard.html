@@ -254,6 +254,141 @@
         .color-light-purple { color: #FF55FF; }
         .color-yellow { color: #FFFF55; }
         .color-white { color: #FFFFFF; }
+        
+        /* 容器弹窗样式 */
+        .container-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+        .container-modal.active {
+            display: flex;
+        }
+        .container-popup {
+            background-color: #2d2d2d;
+            border-radius: 8px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            display: flex;
+            flex-direction: column;
+        }
+        .container-popup-header {
+            padding: 15px 20px;
+            background-color: #3a3a3a;
+            border-radius: 8px 8px 0 0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #4a4a4a;
+        }
+        .container-popup-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #4CAF50;
+        }
+        .container-popup-close {
+            width: 30px;
+            height: 30px;
+            border: none;
+            border-radius: 4px;
+            background-color: #ff4444;
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .container-popup-close:hover {
+            background-color: #cc0000;
+        }
+        .container-popup-content {
+            padding: 20px;
+            overflow-y: auto;
+            flex: 1;
+        }
+        .container-items-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 10px;
+        }
+        .container-item {
+            padding: 12px;
+            border-radius: 6px;
+            background-color: #3a3a3a;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+        }
+        .container-item:hover {
+            background-color: #4a4a4a;
+            border-color: #4CAF50;
+        }
+        .container-item.empty {
+            background-color: #252525;
+            cursor: default;
+        }
+        .container-item.empty:hover {
+            border-color: transparent;
+        }
+        .container-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+        }
+        .container-item-name {
+            font-weight: bold;
+            color: #4CAF50;
+            text-decoration: underline;
+            cursor: pointer;
+        }
+        .container-item-name:hover {
+            color: #66BB6A;
+        }
+        .container-item-count {
+            background-color: #2d2d2d;
+            padding: 2px 8px;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+        .container-item-slot {
+            font-size: 11px;
+            color: #888;
+        }
+        .container-item-id {
+            font-size: 10px;
+            color: #666;
+            margin-top: 3px;
+        }
+        .container-info {
+            padding: 10px 20px;
+            background-color: #252525;
+            border-top: 1px solid #4a4a4a;
+            font-size: 12px;
+            color: #888;
+            border-radius: 0 0 8px 8px;
+        }
+        .click-hint {
+            margin-top: 10px;
+            padding: 10px;
+            background-color: #3a3a3a;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #aaa;
+        }
+        .click-hint strong {
+            color: #4CAF50;
+        }
     </style>
 </head>
 <body>
@@ -276,7 +411,7 @@
             <div class="inventory-sidebar">
                 <div class="inventory-header">
                     <span>背包</span>
-                    <span class="inventory-count" id="inventory-count">0/36</span>
+                    <span class="inventory-count" id="inventory-count">0 / 36</span>
                 </div>
                 <div class="inventory-list" id="inventory-list">
                     <!-- 背包物品将在这里显示 -->
@@ -284,8 +419,29 @@
             </div>
         </div>
         <div class="input-container">
-            <input type="text" id="message-input" placeholder="输入消息或命令...">
+            <input type="text" id="message-input" placeholder="输入消息或命令, 按下 Enter 发送 (.help 获取帮助)">
             <button id="send-button">发送</button>
+        </div>
+    </div>
+
+    <!-- 容器弹窗 -->
+    <div class="container-modal" id="container-modal">
+        <div class="container-popup">
+            <div class="container-popup-header">
+                <span class="container-popup-title" id="container-title">容器</span>
+                <button class="container-popup-close" onclick="closeContainer()">&times;</button>
+            </div>
+            <div class="container-popup-content">
+                <div class="container-items-grid" id="container-items">
+                    <!-- 容器物品将在这里显示 -->
+                </div>
+                <div class="click-hint">
+                    <strong>左键点击</strong> 物品名称：模拟左键点击 | <strong>右键点击</strong> 物品名称：模拟右键点击
+                </div>
+            </div>
+            <div class="container-info" id="container-info">
+                类型: - | 物品数: 0
+            </div>
         </div>
     </div>
 
@@ -469,7 +625,7 @@
             }
             
             // 更新物品计数
-            inventoryCount.textContent = `${inventoryData.items.length}/36`;
+            inventoryCount.textContent = `${inventoryData.items.length} / 36`;
             
             // 按槽位排序
             const sortedItems = [...inventoryData.items].sort((a, b) => a.slot - b.slot);
@@ -546,6 +702,121 @@
             
             return formatted;
         }
+
+        // 容器相关变量
+        let containerData = null;
+        const containerModal = document.getElementById('container-modal');
+        const containerTitle = document.getElementById('container-title');
+        const containerItems = document.getElementById('container-items');
+        const containerInfo = document.getElementById('container-info');
+
+        // 接收容器打开事件
+        socket.on('container_open', (data) => {
+            containerData = data;
+            showContainer(data);
+            addSystemMessage(`容器已打开: ${data.title}`);
+        });
+
+        // 接收容器关闭事件
+        socket.on('container_close', () => {
+            closeContainer();
+            addSystemMessage('容器已关闭');
+        });
+
+        // 接收容器更新事件
+        socket.on('container_update', (data) => {
+            if (containerData) {
+                updateContainerItem(data);
+            }
+        });
+
+        // 显示容器弹窗
+        function showContainer(data) {
+            containerTitle.textContent = data.title || '容器';
+            containerInfo.textContent = `类型: ${data.type || '未知'} | 物品数: ${data.slots ? data.slots.length : 0}`;
+            
+            containerItems.innerHTML = '';
+            
+            if (!data.slots || data.slots.length === 0) {
+                containerItems.innerHTML = '<div style="text-align: center; padding: 20px; color: #888;">容器为空</div>';
+            } else {
+                data.slots.forEach((item, index) => {
+                    const itemElement = document.createElement('div');
+                    itemElement.className = 'container-item';
+                    
+                    itemElement.innerHTML = `
+                        <div class="container-item-header">
+                            <span class="container-item-name" 
+                                  onclick="clickContainerItem(${item.slot}, 0, event)" 
+                                  oncontextmenu="clickContainerItem(${item.slot}, 1, event); return false;">
+                                ${item.displayName || item.name}
+                            </span>
+                            <span class="container-item-count">x${item.count}</span>
+                        </div>
+                        <div class="container-item-slot">槽位: ${item.slot}</div>
+                        <div class="container-item-id">ID: ${item.id}</div>
+                    `;
+                    
+                    containerItems.appendChild(itemElement);
+                });
+            }
+            
+            containerModal.classList.add('active');
+        }
+
+        // 关闭容器弹窗
+        function closeContainer() {
+            containerModal.classList.remove('active');
+            socket.emit('container_close_request');
+        }
+
+        // 点击容器物品
+        function clickContainerItem(slot, mouseButton, event) {
+            event.stopPropagation();
+            
+            if (mouseButton === 0) {
+                console.log(`左键点击容器物品: 槽位 ${slot}`);
+                socket.emit('container_click', { slot: slot, mouseButton: 0 });
+            } else {
+                console.log(`右键点击容器物品: 槽位 ${slot}`);
+                socket.emit('container_right_click', { slot: slot });
+            }
+        }
+
+        // 更新容器物品
+        function updateContainerItem(data) {
+            if (!containerData) return;
+            
+            const slotIndex = containerData.slots.findIndex(item => item && item.slot === data.slot);
+            if (slotIndex !== -1) {
+                if (data.newItem) {
+                    containerData.slots[slotIndex] = {
+                        slot: data.slot,
+                        name: data.newItem.name,
+                        displayName: data.newItem.displayName,
+                        count: data.newItem.count,
+                        id: data.newItem.id
+                    };
+                } else {
+                    containerData.slots.splice(slotIndex, 1);
+                }
+                showContainer(containerData);
+            }
+        }
+
+        // 点击弹窗外部关闭
+        containerModal.addEventListener('click', (e) => {
+            if (e.target === containerModal) {
+                closeContainer();
+            }
+        });
+
+        // ESC键关闭弹窗
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && containerModal.classList.contains('active')) {
+                closeContainer();
+            }
+        });
     </script>
 </body>
 </html>

@@ -5,6 +5,7 @@ const axios = require('axios');
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
+const testmode = process.argv.includes('--test');
 
 // 导入自定义模块
 const AccountManager = require('./accounts');
@@ -13,7 +14,7 @@ const PlayerTracker = require('./playerTracker');
 const ReconnectManager = require('./reconnect');
 
 // 读取配置文件 若包含 --test 参数则使用测试配置
-const configFile = process.argv.includes('--test') ? 'test.config.json' : 'config.json';
+const configFile = testmode ? 'test.config.json' : 'config.json';
 const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
 
 // 创建Express应用
@@ -70,8 +71,8 @@ console.log(`[StarBot]   当前版本: ${starbot_version}`)
 console.log('日志系统已加载完毕。')
 console.log(`本次运行日志文件: ${logFileName}`);
 
+console.log('[StarBotMC] 正在执行 StarCore 初始化 ...');
 const asciiArt = `
-[StarBotMC] 正在执行 StarCore 初始化 ...
  /==========================================================================================\\
 |      ███████╗████████╗ █████╗ ██████╗ ██████╗  ██████╗ ████████╗    ███╗   ███╗ ██████╗    |
 |      ██╔════╝╚══██╔══╝██╔══██╗██╔══██╗██╔══██╗██╔═══██╗╚══██╔══╝    ████╗ ████║██╔════╝    |
@@ -80,10 +81,16 @@ const asciiArt = `
 |      ███████║   ██║   ██║  ██║██║  ██║██████╔╝╚██████╔╝   ██║       ██║ ╚═╝ ██║╚██████╗    |
 |      ╚══════╝   ╚═╝   ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝  ╚═════╝    ╚═╝       ╚═╝     ╚═╝ ╚═════╝    |
  \\==========================================================================================/
-[StarBotMC] StarCore 初始化完成。正在初始化 StarBot ...
 `;
-
 console.log(asciiArt);
+
+if (testmode) {
+  console.log('[StarBotMC] *测试模式, 使用 test.config.json 作为配置文件');
+} else {
+  console.log('[StarBotMC] *使用 config.json 作为配置文件');
+}
+
+console.log('[StarBotMC] StarCore 初始化完成。即将初始化 StarBot ...');
 
 io.on('connection', (socket) => {
   console.log('[WebUI] 网页客户端已连接');
@@ -113,10 +120,10 @@ io.on('connection', (socket) => {
   
   // 发送消息
   socket.on('send_message', (message) => {
-    if (!isAuthenticated()) {
+    if (!isAuthenticated() && !testmode) {
       socket.emit('error', '请先登录');
       return;
-    }
+    };
     
     console.log(`[WebUI] 网页发送消息: ${message}`);
     if (bot) {
@@ -128,14 +135,103 @@ io.on('connection', (socket) => {
       }
     }
   });
+
+  // 容器点击事件
+  socket.on('container_click', (data) => {
+    if (!isAuthenticated() && !testmode) {
+      socket.emit('error', '请先登录');
+      return;
+    }
+    
+    if (!bot) {
+      socket.emit('error', 'Bot未连接');
+      return;
+    }
+    
+    try {
+      const { slot, mouseButton } = data;
+      console.log(`[WebUI] 容器点击: 槽位=${slot}, 按钮=${mouseButton === 0 ? '左键' : '右键'}`);
+      
+      if (bot.currentWindow) {
+        bot.simpleClick.leftMouse(slot);
+      } else {
+        console.log('[WebUI] 没有打开的容器');
+        socket.emit('error', '没有打开的容器');
+      }
+    } catch (err) {
+      console.error('[WebUI] 容器点击失败:', err);
+      socket.emit('error', `容器点击失败: ${err.message}`);
+    }
+  });
+
+  // 容器右键点击事件
+  socket.on('container_right_click', (data) => {
+    if (!isAuthenticated() && !testmode) {
+      socket.emit('error', '请先登录');
+      return;
+    }
+    
+    if (!bot) {
+      socket.emit('error', 'Bot未连接');
+      return;
+    }
+    
+    try {
+      const { slot } = data;
+      console.log(`[WebUI] 容器右键点击: 槽位=${slot}`);
+      
+      if (bot.currentWindow) {
+        bot.simpleClick.rightMouse(slot);
+      } else {
+        console.log('[WebUI] 没有打开的容器');
+        socket.emit('error', '没有打开的容器');
+      }
+    } catch (err) {
+      console.error('[WebUI] 容器右键点击失败:', err);
+      socket.emit('error', `容器右键点击失败: ${err.message}`);
+    }
+  });
+
+  // 关闭容器事件
+  socket.on('container_close_request', () => {
+    if (!isAuthenticated() && !testmode) {
+      socket.emit('error', '请先登录');
+      return;
+    }
+    
+    if (!bot) {
+      socket.emit('error', 'Bot未连接');
+      return;
+    }
+    
+    try {
+      if (bot.currentWindow) {
+        bot.closeWindow(bot.currentWindow);
+        console.log('[WebUI] 已关闭容器');
+      }
+    } catch (err) {
+      console.error('[WebUI] 关闭容器失败:', err);
+      socket.emit('error', `关闭容器失败: ${err.message}`);
+    }
+  });
 });
 
 // Socket.io事件处理
 
+if (config.web.port ? config.web.port : -1 === -1) {
+  console.log('[StarBotMC] Web服务器端口未配置 (web.port), 已设置为 3081');
+  config.web.port = 3081;
+}
+if (config.web.host ? config.web.host : -1 === -1) {
+  console.log('[StarBotMC] Web服务器主机未配置 (web.host), 已设置为 0.0.0.0');
+  config.web.host = '0.0.0.0';
+}
+
 // 启动Web服务器
-const PORT = 3000;
-server.listen(PORT, () => {
-  console.log('[WebUI] Web服务器已启动，访问地址: http://localhost:${PORT}');
+const PORT = config.web.port ? config.web.port : 3081;
+const HOST = config.web.host ? config.web.host : '0.0.0.0';
+server.listen(PORT, HOST, () => {
+  console.log(`[WebUI] Web服务器已启动，访问地址: http://${HOST}:${PORT}`);
 });
 
 // OpenAI API调用函数
@@ -327,7 +423,9 @@ function createBot() {
     host: config.server.host,
     port: config.server.port,
     username: currentAccount.username,
-    version: config.server.version
+    version: config.server.version,
+    hideErrors: false,
+    skipValidation: true
   });
 
   // 加载pathfinder插件
@@ -343,56 +441,85 @@ function createBot() {
   return bot;
 }
 
-function webCmd(message, whisper) {
-  if (whisper !== true) {
-    whisper = false;
-  }
+function webCmd(message, whisper=false, sender='') {
+  // if (whisper !== true) {
+  //   whisper = false;
+  // }
+
+  const isOwner = sender === config.player.owner;
+
   const command = message.split(' ')[0].toLowerCase();
-        
+  
   switch (command) {
     case '.help':
-      showHelp(whisper);
-      return 1;
+      if (isOwner) {
+        showHelp(whisper);
+        return 1;
+      } else {bot.chat(`/minecraft:tell ${sender} 你没有权限！}`);}
     case '.dc':
-      disconnectBot();
+      if (isOwner) {
+        disconnectBot();
+        return 1;
+      } else {bot.chat(`/minecraft:tell ${sender} 你没有权限！}`);}
+    case '.rc':
+      reconnectManager.reconnectNow();
       return 1;
+    case '.stop':
+      if (isOwner) {
+        bot.chat('[StarBotMC] 主人手动关闭机器人，再见！');
+        setTimeout(() => {
+          reconnectManager.disableReconnect();
+          disconnectBot();
+          console.log('[StarBotMC] *用户手动关闭机器人')
+          exit(0);
+        }, 1000);
+        return 1;
+      } else {bot.chat(`/minecraft:tell ${sender} 你没有权限！}`);}
     case '.drop':
-      const argsdrop = message.split(' ').slice(1);
-      if (argsdrop.length > 0) {
-        const slot = parseInt(argsdrop[0]);
-        const count = argsdrop.length > 1 ? parseInt(argsdrop[1]) : undefined;
-        dropItem(slot, count);
-      } else {
-        dropAllItems();
-      }
-      return 1;
+      if (isOwner) {
+        const argsdrop = message.split(' ').slice(1);
+        if (argsdrop.length > 0) {
+          const slot = parseInt(argsdrop[0]);
+          const count = argsdrop.length > 1 ? parseInt(argsdrop[1]) : undefined;
+          dropItem(slot, count);
+        } else {
+          dropAllItems();
+        }
+        return 1;
+      } else {bot.chat(`/minecraft:tell ${sender} 你没有权限！}`);}
     case '.say':
-      const argssay = message.split(' ').slice(1);
-      if (argssay.length > 0) {
-        bot.chat(argssay.join(' '));
-      }
-      return 1;
+      if (isOwner) {
+        const argssay = message.split(' ').slice(1);
+        if (argssay.length > 0) {
+          bot.chat(argssay.join(' '));
+        }
+        return 1;
+      } else {bot.chat(`/minecraft:tell ${sender} 你没有权限！}`);}
     default:
-      io.emit('chat_message', {
-        username: 'StarBotMC',
-        message: `未知命令: ${message}`
-      });
-      io.emit('chat_message', {
-        username: 'StarBotMC',
-        message: `发送"."开头的消息请使用".say <消息>"命令。`
-      });
-      bot.chat(`/minecraft:tell ${config.player.owner} 未知命令: ${message}`);
-      setTimeout(() => {
-        bot.chat(`/minecraft:tell ${config.player.owner} 发送"."开头的消息请使用".say <消息>"命令。`);
-      }, 1000);
-      return true;
+      if (isOwner) {
+        io.emit('chat_message', {
+          username: `StarBotMC -> ${sender}`,
+          message: `未知命令: ${message}`
+        });
+        io.emit('chat_message', {
+          username: `StarBotMC -> ${sender}`,
+          message: `发送"."开头的消息请使用".say <消息>"命令。`
+        });
+        if (command.startsWith('.')) {
+            bot.chat(`/minecraft:tell ${config.player.owner} 未知命令: ${message}`);
+          setTimeout(() => {
+            bot.chat(`/minecraft:tell ${config.player.owner} 发送"."开头的消息请使用".say <消息>"命令。`);
+          }, 1000);
+        };
+        return false;
+      } else {console.log(`[私信] ${sender} >>> ${message}`);return false;}
   }
 }
 
-function whisperCmd(message) {
+function whisperCmd(message, sender='') {
   if (bot) {
-    if (!webCmd(message, true)) {
-      bot.chat(`[StarBotMC] 收到主人私信 >>> ${message}`);
+    if (!webCmd(message, true, sender)) {
+      bot.chat(`[StarBotMC] 收到 ${sender} 私信 >>> ${message}`);
     }
   }
 }
@@ -411,6 +538,24 @@ function setupBotEvents() {
 
   // 错误事件
   bot.on('error', (err) => {
+    const errorMsg = err.message || err.toString();
+    
+    if (errorMsg.includes('array size is abnormally large') || 
+        errorMsg.includes('ERR_OUT_OF_RANGE') ||
+        errorMsg.includes('offset') && errorMsg.includes('out of range')) {
+      console.error('容器数据解析错误 (服务器自定义容器格式):', errorMsg);
+      io.emit('chat_message', {
+        username: 'StarBotMC',
+        message: '§c检测到服务器自定义容器数据，连接可能不稳定'
+      });
+      return;
+    }
+    
+    if (errorMsg.includes('Parse error')) {
+      console.error('数据包解析错误:', errorMsg);
+      return;
+    }
+    
     console.error('错误:', err);
     if (reconnectManager) {
       reconnectManager.handleError(err);
@@ -940,9 +1085,7 @@ function setupBotEvents() {
           type: 'whisper (收到私信)'
         }
       });
-      if (whisperMatch[1] === config.player.owner) {
-        whisperCmd(whisperMatch[2])
-      }
+      whisperCmd(whisperMatch[2], whisperMatch[1])
       return;
     } else if (message.includes('whisper to')) {
       // 其他形式的私聊消息
@@ -1010,6 +1153,67 @@ function setupBotEvents() {
           packetType: packet.type
         }
       });
+    }
+  });
+
+  // 容器打开事件
+  bot.on('windowOpen', (window) => {
+    console.log(`容器已打开: ${window.title} (类型: ${window.type}, 槽位数: ${window.slots.length})`);
+    
+    try {
+      const containerData = {
+        id: window.id,
+        title: window.title,
+        type: window.type,
+        slots: window.slots.map((item, index) => {
+          if (item) {
+            return {
+              slot: index,
+              name: item.name,
+              displayName: item.displayName,
+              count: item.count,
+              id: item.id,
+              nbt: item.nbt
+            };
+          }
+          return null;
+        }).filter(item => item !== null)
+      };
+      
+      io.emit('container_open', containerData);
+    } catch (err) {
+      console.error('处理容器数据时出错:', err);
+    }
+  });
+
+  // 容器关闭事件
+  bot.on('windowClose', () => {
+    console.log('容器已关闭');
+    io.emit('container_close');
+  });
+
+  // 容器更新事件
+  bot.on('windowUpdate', (slot, oldItem, newItem) => {
+    try {
+      const updateData = {
+        slot: slot,
+        oldItem: oldItem ? {
+          name: oldItem.name,
+          displayName: oldItem.displayName,
+          count: oldItem.count,
+          id: oldItem.id
+        } : null,
+        newItem: newItem ? {
+          name: newItem.name,
+          displayName: newItem.displayName,
+          count: newItem.count,
+          id: newItem.id
+        } : null
+      };
+      
+      io.emit('container_update', updateData);
+    } catch (err) {
+      console.error('处理容器更新时出错:', err);
     }
   });
 }
