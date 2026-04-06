@@ -224,8 +224,8 @@ if (!config.web) {
 }
 
 if (config.web.port ? config.web.port : -1 === -1) {
-  console.log('[StarBotMC] Web服务器端口未配置 (web.port), 已设置为 3081');
-  config.web.port = 3081;
+  console.log('[StarBotMC] Web服务器端口未配置 (web.port), 已设置为 25560');
+  config.web.port = 25560;
 }
 if (config.web.host ? config.web.host : -1 === -1) {
   console.log('[StarBotMC] Web服务器主机未配置 (web.host), 已设置为 0.0.0.0');
@@ -233,21 +233,17 @@ if (config.web.host ? config.web.host : -1 === -1) {
 }
 
 // 启动Web服务器，带错误处理
-const PORT = (config.web && config.web.port) ? config.web.port : 3081;
+const DEFAULT_PORT = 3081;
+const PORT = (config.web && config.web.port) ? config.web.port : DEFAULT_PORT;
 const HOST = (config.web && config.web.host) ? config.web.host : '0.0.0.0';
 
-server.listen(PORT, HOST, () => {
-  console.log(`[WebUI] Web服务器已启动，访问地址: http://127.0.0.1:${PORT}`);
-});
-
+// 首先添加错误监听器
 server.on('error', (err) => {
   if (err.code === 'EACCES') {
     console.log(`[WebUI] 端口 ${PORT} 访问被拒绝，尝试使用备用端口...`);
     // 尝试使用备用端口
-    const fallbackPort = 3082;
-    server.listen(fallbackPort, HOST, () => {
-      console.log(`[WebUI] Web服务器已启动，访问地址: http://127.0.0.1:${fallbackPort}`);
-    });
+    let attemptPort = 3082;
+    server.listen(attemptPort, HOST);
   } else if (err.code === 'EADDRINUSE') {
     console.log(`[WebUI] 端口 ${PORT} 已被占用，尝试使用备用端口...`);
     // 循环尝试多个备用端口
@@ -261,30 +257,47 @@ server.on('error', (err) => {
         return;
       }
 
-      server.listen(attemptPort, HOST, () => {
-        console.log(`[WebUI] Web服务器已启动，访问地址: http://127.0.0.1:${attemptPort}`);
-        // 更新配置中的端口值
-        if (!config.web) config.web = {};
-        config.web.port = attemptPort;
-      });
+      console.log(`[WebUI] 尝试端口 ${attemptPort}...`);
+      server.listen(attemptPort, HOST);
+    };
 
-      server.once('error', (retryErr) => {
-        if (retryErr.code === 'EADDRINUSE' || retryErr.code === 'EACCES') {
-          console.log(`[WebUI] 端口 ${attemptPort} 不可用，尝试下一个端口...`);
-          attempts++;
-          attemptPort++;
+    server.once('listening', () => {
+      console.log(`[WebUI] Web服务器已启动，访问地址: http://127.0.0.1:${server.address().port}`);
+      // 更新配置中的端口值
+      if (!config.web) config.web = {};
+      config.web.port = server.address().port;
+    });
+
+    server.once('error', (retryErr) => {
+      if (retryErr.code === 'EADDRINUSE' || retryErr.code === 'EACCES') {
+        console.log(`[WebUI] 端口 ${attemptPort} 不可用，尝试下一个端口...`);
+        attempts++;
+        attemptPort++;
+        if (attempts < maxAttempts) {
           tryNextPort();
         } else {
-          console.error(`[WebUI] 启动Web服务器时发生错误:`, retryErr);
+          console.error(`[WebUI] 无法找到可用端口，已达最大尝试次数`);
         }
-      });
-    };
+      } else {
+        console.error(`[WebUI] 启动Web服务器时发生错误:`, retryErr);
+      }
+    });
 
     tryNextPort();
   } else {
     console.error(`[WebUI] 启动Web服务器时发生错误:`, err);
   }
 });
+
+server.once('listening', () => {
+  console.log(`[WebUI] Web服务器已启动，访问地址: http://127.0.0.1:${server.address().port}`);
+  // 更新配置中的端口值
+  if (!config.web) config.web = {};
+  config.web.port = server.address().port;
+});
+
+// 开始尝试监听
+server.listen(PORT, HOST);
 
 // OpenAI API调用函数
 async function getAIResponse(message, options = {}) {
