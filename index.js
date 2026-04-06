@@ -14,7 +14,7 @@ const PlayerTracker = require('./playerTracker');
 const ReconnectManager = require('./reconnect');
 
 // 读取配置文件 若包含 --test 参数则使用测试配置
-const configFile = testmode ? 'test.config.json' : 'config.json';
+const configFile = testmode ? '.test.config.json' : 'config.json';
 const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
 
 // 创建Express应用
