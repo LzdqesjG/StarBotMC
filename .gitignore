@@ -1,7 +1,10 @@
 # test files
 test.config.json
-# config files
 config.json
+.test.config.json
+.test.*
+
+
 # Logs
 logs
 *.log
@@ -141,3 +144,4 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+start.bat

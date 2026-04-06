@@ -12,9 +12,10 @@ const AccountManager = require('./accounts');
 const AuthManager = require('./auth');
 const PlayerTracker = require('./playerTracker');
 const ReconnectManager = require('./reconnect');
+const AIManager = require('./aiManager');
 
 // 读取配置文件 若包含 --test 参数则使用测试配置
-const configFile = testmode ? 'test.config.json' : 'config.json';
+const configFile = testmode ? '.test.config.json' : 'config.json';
 const config = JSON.parse(fs.readFileSync(configFile, 'utf8'));
 
 // 创建Express应用
@@ -218,24 +219,92 @@ io.on('connection', (socket) => {
 
 // Socket.io事件处理
 
+if (!config.web) {
+  config.web = {};
+}
+
 if (config.web.port ? config.web.port : -1 === -1) {
-  console.log('[StarBotMC] Web服务器端口未配置 (web.port), 已设置为 3081');
-  config.web.port = 3081;
+  console.log('[StarBotMC] Web服务器端口未配置 (web.port), 已设置为 25560');
+  config.web.port = 25560;
 }
 if (config.web.host ? config.web.host : -1 === -1) {
   console.log('[StarBotMC] Web服务器主机未配置 (web.host), 已设置为 0.0.0.0');
   config.web.host = '0.0.0.0';
 }
 
-// 启动Web服务器
-const PORT = config.web.port ? config.web.port : 3081;
-const HOST = config.web.host ? config.web.host : '0.0.0.0';
-server.listen(PORT, HOST, () => {
-  console.log(`[WebUI] Web服务器已启动，访问地址: http://127.0.0.1:${PORT}`);
+// 启动Web服务器，带错误处理
+const DEFAULT_PORT = 3081;
+const PORT = (config.web && config.web.port) ? config.web.port : DEFAULT_PORT;
+const HOST = (config.web && config.web.host) ? config.web.host : '0.0.0.0';
+
+// 首先添加错误监听器
+server.on('error', (err) => {
+  if (err.code === 'EACCES') {
+    console.log(`[WebUI] 端口 ${PORT} 访问被拒绝，尝试使用备用端口...`);
+    // 尝试使用备用端口
+    let attemptPort = 3082;
+    server.listen(attemptPort, HOST);
+  } else if (err.code === 'EADDRINUSE') {
+    console.log(`[WebUI] 端口 ${PORT} 已被占用，尝试使用备用端口...`);
+    // 循环尝试多个备用端口
+    let attemptPort = PORT + 1;
+    const maxAttempts = 10;
+    let attempts = 0;
+
+    const tryNextPort = () => {
+      if (attempts >= maxAttempts) {
+        console.error(`[WebUI] 无法绑定到任何端口，已达最大尝试次数`);
+        return;
+      }
+
+      console.log(`[WebUI] 尝试端口 ${attemptPort}...`);
+      server.listen(attemptPort, HOST);
+    };
+
+    server.once('listening', () => {
+      console.log(`[WebUI] Web服务器已启动，访问地址: http://127.0.0.1:${server.address().port}`);
+      // 更新配置中的端口值
+      if (!config.web) config.web = {};
+      config.web.port = server.address().port;
+    });
+
+    server.once('error', (retryErr) => {
+      if (retryErr.code === 'EADDRINUSE' || retryErr.code === 'EACCES') {
+        console.log(`[WebUI] 端口 ${attemptPort} 不可用，尝试下一个端口...`);
+        attempts++;
+        attemptPort++;
+        if (attempts < maxAttempts) {
+          tryNextPort();
+        } else {
+          console.error(`[WebUI] 无法找到可用端口，已达最大尝试次数`);
+        }
+      } else {
+        console.error(`[WebUI] 启动Web服务器时发生错误:`, retryErr);
+      }
+    });
+
+    tryNextPort();
+  } else {
+    console.error(`[WebUI] 启动Web服务器时发生错误:`, err);
+  }
 });
 
+server.once('listening', () => {
+  console.log(`[WebUI] Web服务器已启动，访问地址: http://127.0.0.1:${server.address().port}`);
+  // 更新配置中的端口值
+  if (!config.web) config.web = {};
+  config.web.port = server.address().port;
+});
+
+// 开始尝试监听
+server.listen(PORT, HOST);
+
 // OpenAI API调用函数
-async function getAIResponse(message) {
+async function getAIResponse(message, options = {}) {
+  if (!aiManager) {
+    return 'AI管理器未初始化，请检查配置。';
+  }
+  return await aiManager.getAIResponse(message, options);
   try {
     // 检查API密钥是否配置
     if (!config.openai.apiKey || config.openai.apiKey === 'your-api-key-here') {
@@ -278,6 +347,7 @@ let accountManager = null;
 let authManager = null;
 let playerTracker = null;
 let reconnectManager = null;
+let aiManager = null; // AI管理器
 let isConnected = false; // 跟踪bot连接状态
 let lastPlayerCount = 0; // 上次玩家数量
 let emptyPlayerListCount = 0; // 玩家列表为空的次数
@@ -416,6 +486,12 @@ function createBot() {
     bot.end();
   }
 
+  // 确保配置存在
+  if (!config.server) {
+    console.error('[ERROR] 服务器配置缺失，请检查config.json文件');
+    return;
+  }
+
   // 获取当前账户
   const currentAccount = accountManager ? accountManager.getCurrentAccount() : config.player;
 
@@ -452,20 +528,24 @@ function webCmd(message, whisper=false, sender='') {
   
   switch (command) {
     case '.help':
-      if (isOwner) {
+      if (isOwner && whisper) {
         showHelp(whisper);
         return 1;
-      } else {bot.chat(`/minecraft:tell ${sender} 你没有权限！}`);}
+      } else {bot.chat(`/minecraft:tell ${sender} 你没有权限！`);}
     case '.dc':
-      if (isOwner) {
+      if (isOwner && whisper) {
+        bot.chat('[StarBotMC] 主人手动操作机器人断开连接。');
         disconnectBot();
         return 1;
-      } else {bot.chat(`/minecraft:tell ${sender} 你没有权限！}`);}
+      } else {bot.chat(`/minecraft:tell ${sender} 你没有权限！`);}
     case '.rc':
-      reconnectManager.reconnectNow();
-      return 1;
+      if (isOwner && whisper) {
+        bot.chat('[StarBotMC] 主人手动操作机器人重新连接。');
+        reconnectManager.reconnectNow();
+        return 1;
+      } else {bot.chat(`/minecraft:tell ${sender} 你没有权限！`);}
     case '.stop':
-      if (isOwner) {
+      if (isOwner && whisper) {
         bot.chat('[StarBotMC] 主人手动关闭机器人，再见！');
         setTimeout(() => {
           reconnectManager.disableReconnect();
@@ -474,9 +554,9 @@ function webCmd(message, whisper=false, sender='') {
           exit(0);
         }, 1000);
         return 1;
-      } else {bot.chat(`/minecraft:tell ${sender} 你没有权限！}`);}
+      } else {bot.chat(`/minecraft:tell ${sender} 你没有权限！`);}
     case '.drop':
-      if (isOwner) {
+      if (isOwner && whisper) {
         const argsdrop = message.split(' ').slice(1);
         if (argsdrop.length > 0) {
           const slot = parseInt(argsdrop[0]);
@@ -486,17 +566,17 @@ function webCmd(message, whisper=false, sender='') {
           dropAllItems();
         }
         return 1;
-      } else {bot.chat(`/minecraft:tell ${sender} 你没有权限！}`);}
+      } else {bot.chat(`/minecraft:tell ${sender} 你没有权限！`);}
     case '.say':
-      if (isOwner) {
+      if (isOwner && whisper) {
         const argssay = message.split(' ').slice(1);
         if (argssay.length > 0) {
           bot.chat(argssay.join(' '));
         }
         return 1;
-      } else {bot.chat(`/minecraft:tell ${sender} 你没有权限！}`);}
+      } else {bot.chat(`/minecraft:tell ${sender} 你没有权限！`);}
     default:
-      if (isOwner) {
+      if (isOwner && whisper) {
         io.emit('chat_message', {
           username: `StarBotMC -> ${sender}`,
           message: `未知命令: ${message}`
@@ -1341,6 +1421,15 @@ function forceUpdatePlayerList() {
 // 初始化账户管理器
 accountManager = new AccountManager(config);
 
+// 初始化AI管理器
+aiManager = new AIManager(config);
+console.log('[AI] AI管理器已初始化，支持平台:', aiManager.getSupportedPlatforms().join(', '));
+
+// 初始化重连管理器
+reconnectManager = new ReconnectManager(config, createBot);
+if (config.reconnect && config.reconnect.enabled) {
+  reconnectManager.enableReconnect();
+}
 // 初始化重连管理器
 reconnectManager = new ReconnectManager(config, createBot);
 if (config.reconnect && config.reconnect.enabled) {
