@@ -634,7 +634,7 @@
             sortedItems.forEach((item, index) => {
                 const itemElement = document.createElement('div');
                 itemElement.className = 'inventory-item';
-
+                
                 // 创建物品图标
                 const iconElement = createItemIcon(item.name, item.displayName, item.count);
                 const itemName = item.displayName || item.name || 'Unknown Item';
@@ -696,31 +696,31 @@
                     itemElement.className = 'inventory-item';
         
                     // 创建物品图标
-                    const iconElement = inventoryHUD.getItemIcon(item.name, item.displayName);
-        
-                    const itemName = item.displayName || item.name || 'Unknown Item';
-                    const itemId = item.name || 'unknown';
-                    const itemCount = item.count || 0;
-                    const nbtId = `nbt-${index}`;
-        
-                    itemElement.innerHTML = `
-                        <div style="display: flex; align-items: center; margin-bottom: 5px;">
-                            <div style="display: flex; align-items: center; margin-right: 8px;">
-                                <img src="${iconElement.src}" style="width: 24px; height: 24px; vertical-align: middle;" alt="${item.name}">
+                const iconElement = inventoryHUD.getItemIcon(item.name, item.displayName);
+                
+                const itemName = item.displayName || item.name || 'Unknown Item';
+                const itemId = item.name || 'unknown';
+                const itemCount = item.count || 0;
+                const nbtId = `nbt-${index}`;
+                
+                itemElement.innerHTML = `
+                    <div style="display: flex; align-items: center; margin-bottom: 5px;">
+                        <div style="display: flex; align-items: center; margin-right: 8px;">
+                            <img src="${iconElement.src}" style="width: 24px; height: 24px; vertical-align: middle;" alt="${item.name}">
                         </div>
                         <div style="flex-grow: 1;">
                             <div class="inventory-item-header">
                                 <span class="item-name">${itemName}</span>
                                 <span class="item-count">x${itemCount}</span>
+                            </div>
+                            <div class="item-id">ID: ${item.id} | ${item.name}</div>
+                            <div class="item-slot">槽位: ${item.slot}</div>
+                            ${item.nbt ? `<div class="nbt-toggle" onclick="toggleNbt('${nbtId}')">显示NBT数据</div>` : ''}
+                            ${item.nbt ? `<div id="${nbtId}" class="nbt-container" style="display: none;">${formatNbt(item.nbt)}</div>` : ''}
                         </div>
-                        <div class="item-id">ID: ${item.id} | ${item.name}</div>
-                        <div class="item-slot">槽位: ${item.slot}</div>
-                        ${item.nbt ? `<div class="nbt-toggle" onclick="toggleNbt('${nbtId}')">显示NBT数据</div>` : ''}
-                        ${item.nbt ? `<div id="${nbtId}" class="nbt-container" style="display: none;">${formatNbt(item.nbt)}</div>` : ''}
-                        </div>
-                        </div>
-                        `;
-        
+                    </div>
+                `;
+                
                         inventoryList.appendChild(itemElement);
                     });
                 }
@@ -909,5 +909,35 @@
             }
         });
     </script>
+    <!-- 指令列表 -->
+    <div style="margin-top: 20px; padding: 15px; background-color: #3a3a3a; border-radius: 8px; border-top: 1px solid #4a4a4a;">
+        <h3 style="color: #4CAF50; margin-top: 0; border-bottom: 1px solid #4a4a4a; padding-bottom: 10px;">指令列表</h3>
+        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 15px;">
+            <div>
+                <h4 style="color: #66BB6A; margin-bottom: 8px;">基础指令</h4>
+                <ul style="color: #ccc; padding-left: 20px; margin: 0;">
+                    <li><strong>.help</strong> - 显示帮助信息</li>
+                    <li><strong>.dc</strong> - 断开机器人连接</li>
+                    <li><strong>.rc</strong> - 重新连接机器人</li>
+                    <li><strong>.stop</strong> - 停止机器人</li>
+                </ul>
+            </div>
+            <div>
+                <h4 style="color: #66BB6A; margin-bottom: 8px;">背包指令</h4>
+                <ul style="color: #ccc; padding-left: 20px; margin: 0;">
+                    <li><strong>.drop</strong> - 丢弃所有物品</li>
+                    <li><strong>.drop &lt;栏位&gt;</strong> - 丢弃指定栏位物品</li>
+                    <li><strong>.drop &lt;栏位&gt; &lt;数量&gt;</strong> - 丢弃指定数量物品</li>
+                </ul>
+            </div>
+            <div>
+                <h4 style="color: #66BB6A; margin-bottom: 8px;">其他指令</h4>
+                <ul style="color: #ccc; padding-left: 20px; margin: 0;">
+                    <li><strong>.say &lt;消息&gt;</strong> - 发送消息</li>
+                    <li><strong>.github</strong> - 获取GitHub链接</li>
+                </ul>
+            </div>
+        </div>
+    </div>
 </body>
 </html>
