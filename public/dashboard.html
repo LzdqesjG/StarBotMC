@@ -444,8 +444,9 @@
             </div>
         </div>
     </div>
-
+    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.2/socket.io.min.js"></script>
+    <script src="invhud.js"></script>
     <script>
         const socket = io();
         const chatContainer = document.getElementById('chat-container');
@@ -633,7 +634,97 @@
             sortedItems.forEach((item, index) => {
                 const itemElement = document.createElement('div');
                 itemElement.className = 'inventory-item';
+
+                // 创建物品图标
+                const iconElement = createItemIcon(item.name, item.displayName, item.count);
+                const itemName = item.displayName || item.name || 'Unknown Item';
+                const itemId = item.name || 'unknown';
+                const itemCount = item.count || 0;
                 
+                itemElement.innerHTML = `
+                    <div style="display: flex; align-items: center; margin-bottom: 5px;">
+                        ${iconElement}
+                        <div style="flex-grow: 1;">
+                            <div class="inventory-item-header">
+                                <span class="item-name">${itemName}</span>
+                                <span class="item-count">${itemCount}</span>
+                            </div>
+                            <div class="item-id">${itemId}</div>
+                            <div class="item-slot">槽位: ${item.slot}</div>
+                        </div>
+                    </div>
+                `;
+                
+                // 添加点击事件
+                itemElement.addEventListener('click', () => {
+                    // 显示NBT数据（如果有）
+                    if (item.nbt) {
+                        // 创建或更新NBT显示区域
+                        const existingNbt = itemElement.querySelector('.nbt-container');
+                        if (existingNbt) {
+                            existingNbt.remove();
+                        } else {
+                            const nbtContainer = document.createElement('div');
+                            nbtContainer.className = 'nbt-container';
+                            nbtContainer.textContent = JSON.stringify(item.nbt, null, 2);
+                            itemElement.appendChild(nbtContainer);
+                        }
+                    }
+                });
+                
+                inventoryList.appendChild(itemElement);
+                itemElement.className = 'inventory-item';
+                
+                // 更新背包列表
+                function updateInventoryList() {
+                    inventoryList.innerHTML = '';
+    
+                    if (!inventoryData.items || inventoryData.items.length === 0) {
+                        inventoryList.innerHTML = '<div style="text-align: center; padding: 20px; color: #888;">背包为空</div>';
+                        inventoryCount.textContent = '0/36';
+                        return;
+                    }
+    
+                    // 更新物品计数
+                    inventoryCount.textContent = `${inventoryData.items.length} / 36`;
+    
+                    // 按槽位排序
+                    const sortedItems = [...inventoryData.items].sort((a, b) => a.slot - b.slot);
+    
+                    sortedItems.forEach((item, index) => {
+                    const itemElement = document.createElement('div');
+                    itemElement.className = 'inventory-item';
+        
+                    // 创建物品图标
+                    const iconElement = inventoryHUD.getItemIcon(item.name, item.displayName);
+        
+                    const itemName = item.displayName || item.name || 'Unknown Item';
+                    const itemId = item.name || 'unknown';
+                    const itemCount = item.count || 0;
+                    const nbtId = `nbt-${index}`;
+        
+                    itemElement.innerHTML = `
+                        <div style="display: flex; align-items: center; margin-bottom: 5px;">
+                            <div style="display: flex; align-items: center; margin-right: 8px;">
+                                <img src="${iconElement.src}" style="width: 24px; height: 24px; vertical-align: middle;" alt="${item.name}">
+                        </div>
+                        <div style="flex-grow: 1;">
+                            <div class="inventory-item-header">
+                                <span class="item-name">${itemName}</span>
+                                <span class="item-count">x${itemCount}</span>
+                        </div>
+                        <div class="item-id">ID: ${item.id} | ${item.name}</div>
+                        <div class="item-slot">槽位: ${item.slot}</div>
+                        ${item.nbt ? `<div class="nbt-toggle" onclick="toggleNbt('${nbtId}')">显示NBT数据</div>` : ''}
+                        ${item.nbt ? `<div id="${nbtId}" class="nbt-container" style="display: none;">${formatNbt(item.nbt)}</div>` : ''}
+                        </div>
+                        </div>
+                        `;
+        
+                        inventoryList.appendChild(itemElement);
+                    });
+                }
+
                 const nbtId = `nbt-${index}`;
                 
                 itemElement.innerHTML = `

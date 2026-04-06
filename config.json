@@ -93,10 +93,10 @@
     "command": "/signin"
   },
   "startupCommands": [
-    "/login your_password_here"
+    ""
   ],
   "web": {
-    "password": "your_web_password_here",
+    "password": "111",
     "port": 3081,
     "host": "0.0.0.0"          
   }
