@@ -815,7 +815,7 @@ async function webCmd(message, whisper=false, sender='') {
           }
         }
         return 1;
-      } else {bot.chat(`/minecraft:tell ${sender} 你没有权限！`);}
+      } // else {bot.chat(`/minecraft:tell ${sender} 你没有权限！`);}
     default:
       if (isOwner && whisper) {
         io.emit('chat_message', {
