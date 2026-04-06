@@ -15,28 +15,50 @@ const PlayerTracker = require('./playerTracker');
 const ReconnectManager = require('./reconnect');
 const AIManager = require('./aiManager');
 
+let starupCommandsCompleted = false;
+
 // IRC客户端类
 class IRCClient {
     constructor(config) {
         this.config = config;
         this.apiUrl = `http://${config.server}${config.apiPath}`;
-        this.wsUrl = config.wsPath;
         this.botName = config.botName;
         this.apiKey = config.apiKey;
-        this.ws = null;
-        this.connected = false;
+        this.lastMessageId = 0;
+        this.pollingInterval = null;
     }
     
     // 注册bot
     async register() {
         try {
-            const response = await axios.post(this.apiUrl, {
+            console.log('[IRC] 开始注册Bot:', this.botName);
+            console.log('[IRC] API URL:', this.apiUrl);
+            console.log('[IRC] 注册数据:', {
                 action: 'register',
                 bot_name: this.botName,
                 owner_name: config.player.owner,
                 server: `${config.server.host}:${config.server.port}`,
                 player_name: config.player.username
             });
+            
+            const response = await axios.post(this.apiUrl, {
+                action: 'register',
+                bot_name: this.botName,
+                owner_name: config.player.owner,
+                server: `${config.server.host}:${config.server.port}`,
+                player_name: config.player.username
+            }, {
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                },
+                transformRequest: [(data) => {
+                    const encodedData = Object.keys(data).map(key => `${encodeURIComponent(key)}=${encodeURIComponent(data[key])}`).join('&');
+                    console.log('[IRC] 发送的数据:', encodedData);
+                    return encodedData;
+                }]
+            });
+            
+            console.log('[IRC] 注册响应:', response.data);
             
             if (response.data.success) {
                 this.apiKey = response.data.api_key;
@@ -46,7 +68,7 @@ class IRCClient {
                 console.log('[IRC] Bot注册成功');
                 return true;
             } else {
-                console.error('[IRC] Bot注册失败:', response.data.error);
+                console.error('[IRC] Bot注册失败:', response.data.error || '未知错误');
                 return false;
             }
         } catch (error) {
@@ -91,57 +113,75 @@ class IRCClient {
         }
     }
     
-    // 连接WebSocket
-    connectWebSocket() {
-        if (!this.apiKey) return;
+    // 发送IRC消息
+    async sendMessage(message) {
+        if (!this.apiKey) return false;
         
-        this.ws = new WebSocket(this.wsUrl);
-        
-        this.ws.on('open', () => {
-            console.log('[IRC] WebSocket连接成功');
-            this.connected = true;
-            // 注册bot
-            this.ws.send(JSON.stringify({
-                action: 'register_bot',
-                bot_name: this.botName,
-                api_key: this.apiKey
-            }));
-        });
-        
-        this.ws.on('message', (data) => {
-            try {
-                const message = JSON.parse(data);
-                if (message.type === 'message') {
-                    // 接收IRC消息
-                    this.handleIRCMessage(message);
-                }
-            } catch (error) {
-                console.error('[IRC] 解析消息错误:', error.message);
+        try {
+            const response = await axios.post(this.apiUrl, {
+                action: 'send_message',
+                api_key: this.apiKey,
+                sender: config.player.owner,
+                message: message
+            });
+            
+            if (response.data.success) {
+                console.log('[IRC] 消息发送成功');
+                return true;
+            } else {
+                console.error('[IRC] 消息发送失败:', response.data.error);
+                return false;
             }
-        });
-        
-        this.ws.on('close', () => {
-            console.log('[IRC] WebSocket连接关闭');
-            this.connected = false;
-            // 重连
-            setTimeout(() => this.connectWebSocket(), 5000);
-        });
-        
-        this.ws.on('error', (error) => {
-            console.error('[IRC] WebSocket错误:', error.message);
-        });
+        } catch (error) {
+            console.error('[IRC] 发送消息错误:', error.message);
+            return false;
+        }
     }
     
-    // 发送IRC消息
-    sendMessage(message) {
-        if (!this.connected || !this.apiKey) return;
+    // 开始消息轮询
+    startPolling() {
+        this.stopPolling();
         
-        this.ws.send(JSON.stringify({
-            action: 'send_message',
-            bot_name: this.botName,
-            sender: config.player.owner,
-            message: message
-        }));
+        this.pollingInterval = setInterval(async () => {
+            await this.pollMessages();
+        }, 3000); // 每3秒轮询一次
+        
+        console.log('[IRC] 消息轮询已启动');
+    }
+    
+    // 停止消息轮询
+    stopPolling() {
+        if (this.pollingInterval) {
+            clearInterval(this.pollingInterval);
+            this.pollingInterval = null;
+        }
+    }
+    
+    // 轮询消息
+    async pollMessages() {
+        if (!this.apiKey) return;
+        
+        try {
+            const response = await axios.get(this.apiUrl, {
+                params: {
+                    action: 'get_messages',
+                    last_id: this.lastMessageId,
+                    limit: 50
+                }
+            });
+            
+            if (response.data.success && response.data.messages) {
+                for (const message of response.data.messages) {
+                    if (message.id > this.lastMessageId) {
+                        this.lastMessageId = message.id;
+                        this.handleIRCMessage(message);
+                    }
+                }
+            }
+        } catch (error) {
+            // 轮询错误不影响正常运行，只记录日志
+            console.debug('[IRC] 轮询消息错误:', error.message);
+        }
     }
     
     // 处理IRC消息
@@ -177,6 +217,18 @@ class IRCClient {
             console.error('[IRC] 获取在线bot错误:', error.message);
             return [];
         }
+    }
+    
+    // 初始化
+    async initialize() {
+        if (this.apiKey) {
+            this.startPolling();
+        }
+    }
+    
+    // 关闭
+    close() {
+        this.stopPolling();
     }
 }
 
@@ -684,10 +736,14 @@ function createBot() {
   return bot;
 }
 
-function webCmd(message, whisper=false, sender='') {
+async function webCmd(message, whisper=false, sender='') {
   // if (whisper !== true) {
   //   whisper = false;
   // }
+
+  if (!starupCommandsCompleted) {
+    return 0;
+  }
 
   const isOwner = sender === config.player.owner;
 
@@ -698,19 +754,19 @@ function webCmd(message, whisper=false, sender='') {
       if (isOwner && whisper) {
         showHelp(whisper);
         return 1;
-      } else {bot.chat(`/minecraft:tell ${sender} 你没有权限！`);}
+      } //else {bot.chat(`/minecraft:tell ${sender} 你没有权限！`);}
     case '.dc':
       if (isOwner && whisper) {
         bot.chat('[StarBotMC] 主人手动操作机器人断开连接。');
         disconnectBot();
         return 1;
-      } else {bot.chat(`/minecraft:tell ${sender} 你没有权限！`);}
+      } //else {bot.chat(`/minecraft:tell ${sender} 你没有权限！`);}
     case '.rc':
       if (isOwner && whisper) {
         bot.chat('[StarBotMC] 主人手动操作机器人重新连接。');
         reconnectManager.reconnectNow();
         return 1;
-      } else {bot.chat(`/minecraft:tell ${sender} 你没有权限！`);}
+      } //else {bot.chat(`/minecraft:tell ${sender} 你没有权限！`);}
     case '.stop':
       if (isOwner && whisper) {
         bot.chat('[StarBotMC] 主人手动关闭机器人，再见！');
@@ -721,7 +777,7 @@ function webCmd(message, whisper=false, sender='') {
           exit(0);
         }, 1000);
         return 1;
-      } else {bot.chat(`/minecraft:tell ${sender} 你没有权限！`);}
+      } //else {bot.chat(`/minecraft:tell ${sender} 你没有权限！`);}
     case '.drop':
       if (isOwner && whisper) {
         const argsdrop = message.split(' ').slice(1);
@@ -733,7 +789,7 @@ function webCmd(message, whisper=false, sender='') {
           dropAllItems();
         }
         return 1;
-      } else {bot.chat(`/minecraft:tell ${sender} 你没有权限！`);}
+      } //else {bot.chat(`/minecraft:tell ${sender} 你没有权限！`);}
     case '.say':
       if (isOwner && whisper) {
         const argssay = message.split(' ').slice(1);
@@ -741,15 +797,19 @@ function webCmd(message, whisper=false, sender='') {
           bot.chat(argssay.join(' '));
         }
         return 1;
-      } else {bot.chat(`/minecraft:tell ${sender} 你没有权限！`);}
+      } //else {bot.chat(`/minecraft:tell ${sender} 你没有权限！`);}
     case '.i':
       // IRC消息指令
       if (isOwner && whisper) {
         const ircMessage = message.split(' ').slice(1).join(' ');
         if (ircMessage) {
           if (ircClient) {
-            ircClient.sendMessage(ircMessage);
-            bot.chat(`[IRC] 已发送消息: ${ircMessage}`);
+            const success = await ircClient.sendMessage(ircMessage);
+            if (success) {
+              bot.chat(`[IRC] 已发送消息: ${ircMessage}`);
+            } else {
+              bot.chat(`[IRC] 消息发送失败`);
+            }
           } else {
             bot.chat('[IRC] IRC客户端未初始化');
           }
@@ -777,10 +837,11 @@ function webCmd(message, whisper=false, sender='') {
   }
 }
 
-function whisperCmd(message, sender='') {
+async function whisperCmd(message, sender='') {
   if (bot) {
-    if (!webCmd(message, true, sender)) {
-      bot.chat(`[StarBotMC] 收到 ${sender} 私信 >>> ${message}`);
+    const result = await webCmd(message, true, sender);
+    if (!result) {
+      //bot.chat(`[StarBotMC] 收到 ${sender} 私信 >>> ${message}`);
     }
   }
 }
@@ -846,12 +907,12 @@ function setupBotEvents() {
 
   // 执行启动命令序列
   function executeStartupCommands() {
-    if (config.startupCommands && config.startupCommands.length > 0) {
+    if (config.startupCommands && config.startupCommands.length > 0 && bot) {
       console.log('开始执行启动命令序列...');
       
       let index = 0;
       function executeNextCommand() {
-        if (index < config.startupCommands.length) {
+        if (index < config.startupCommands.length && bot) {
           const command = config.startupCommands[index];
           console.log(`执行命令: ${command}`);
           bot.chat(command);
@@ -864,7 +925,8 @@ function setupBotEvents() {
       }
       
       executeNextCommand();
-    }
+    };
+    starupCommandsCompleted = true;
   }
 
   // 执行自动签到
@@ -1335,7 +1397,7 @@ function setupBotEvents() {
   });
 
   // 消息字符串事件
-  bot.on('messagestr', (message) => {
+  bot.on('messagestr', async (message) => {
     if (message === '.github') {
       bot.chat('https://github.com/LzdqesjG/StarBotMC/');
       setTimeout(() =>{
@@ -1354,7 +1416,7 @@ function setupBotEvents() {
           type: 'whisper (收到私信)'
         }
       });
-      whisperCmd(whisperMatch[2], whisperMatch[1])
+      await whisperCmd(whisperMatch[2], whisperMatch[1]);
       return;
     } else if (message.includes('whisper to')) {
       // 其他形式的私聊消息
@@ -1660,21 +1722,14 @@ if (config.irc && config.irc.enabled) {
   console.log('[IRC] 正在初始化IRC客户端...');
   ircClient = new IRCClient(config.irc);
   
-  // 检查bot名称是否可用
+  // 注册bot
   (async () => {
-    const nameAvailable = await ircClient.checkBotName();
-    if (!nameAvailable) {
-      console.error('[IRC] Bot名称已被使用，无法启动');
-      process.exit(1);
-    }
-    
-    // 注册bot
     if (!config.irc.apiKey) {
       await ircClient.register();
     }
     
-    // 连接WebSocket
-    ircClient.connectWebSocket();
+    // 初始化IRC客户端
+    ircClient.initialize();
   })();
 }
 

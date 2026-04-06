@@ -104,7 +104,6 @@
     "enabled": true,
     "server": "test.cyrene.wiki",
     "apiPath": "/StarBotMC/api.php",
-    "wsPath": "ws://test.cyrene.wiki:8080",
     "botName": "YourBotName",
     "apiKey": ""  
   }
