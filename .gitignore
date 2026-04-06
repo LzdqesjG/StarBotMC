@@ -1,4 +1,4 @@
-# test files
+# test files (don't del ".test.config.json" !!!!!!!!!!!!)
 .test.config.json
 .test.*
 
