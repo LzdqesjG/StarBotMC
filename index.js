@@ -12,6 +12,7 @@ const AccountManager = require('./accounts');
 const AuthManager = require('./auth');
 const PlayerTracker = require('./playerTracker');
 const ReconnectManager = require('./reconnect');
+const AIManager = require('./aiManager');
 
 // 读取配置文件 若包含 --test 参数则使用测试配置
 const configFile = testmode ? 'test.config.json' : 'config.json';
@@ -218,6 +219,10 @@ io.on('connection', (socket) => {
 
 // Socket.io事件处理
 
+if (!config.web) {
+  config.web = {};
+}
+
 if (config.web.port ? config.web.port : -1 === -1) {
   console.log('[StarBotMC] Web服务器端口未配置 (web.port), 已设置为 3081');
   config.web.port = 3081;
@@ -227,15 +232,66 @@ if (config.web.host ? config.web.host : -1 === -1) {
   config.web.host = '0.0.0.0';
 }
 
-// 启动Web服务器
-const PORT = config.web.port ? config.web.port : 3081;
-const HOST = config.web.host ? config.web.host : '0.0.0.0';
+// 启动Web服务器，带错误处理
+const PORT = (config.web && config.web.port) ? config.web.port : 3081;
+const HOST = (config.web && config.web.host) ? config.web.host : '0.0.0.0';
+
 server.listen(PORT, HOST, () => {
   console.log(`[WebUI] Web服务器已启动，访问地址: http://127.0.0.1:${PORT}`);
 });
 
+server.on('error', (err) => {
+  if (err.code === 'EACCES') {
+    console.log(`[WebUI] 端口 ${PORT} 访问被拒绝，尝试使用备用端口...`);
+    // 尝试使用备用端口
+    const fallbackPort = 3082;
+    server.listen(fallbackPort, HOST, () => {
+      console.log(`[WebUI] Web服务器已启动，访问地址: http://127.0.0.1:${fallbackPort}`);
+    });
+  } else if (err.code === 'EADDRINUSE') {
+    console.log(`[WebUI] 端口 ${PORT} 已被占用，尝试使用备用端口...`);
+    // 循环尝试多个备用端口
+    let attemptPort = PORT + 1;
+    const maxAttempts = 10;
+    let attempts = 0;
+
+    const tryNextPort = () => {
+      if (attempts >= maxAttempts) {
+        console.error(`[WebUI] 无法绑定到任何端口，已达最大尝试次数`);
+        return;
+      }
+
+      server.listen(attemptPort, HOST, () => {
+        console.log(`[WebUI] Web服务器已启动，访问地址: http://127.0.0.1:${attemptPort}`);
+        // 更新配置中的端口值
+        if (!config.web) config.web = {};
+        config.web.port = attemptPort;
+      });
+
+      server.once('error', (retryErr) => {
+        if (retryErr.code === 'EADDRINUSE' || retryErr.code === 'EACCES') {
+          console.log(`[WebUI] 端口 ${attemptPort} 不可用，尝试下一个端口...`);
+          attempts++;
+          attemptPort++;
+          tryNextPort();
+        } else {
+          console.error(`[WebUI] 启动Web服务器时发生错误:`, retryErr);
+        }
+      });
+    };
+
+    tryNextPort();
+  } else {
+    console.error(`[WebUI] 启动Web服务器时发生错误:`, err);
+  }
+});
+
 // OpenAI API调用函数
-async function getAIResponse(message) {
+async function getAIResponse(message, options = {}) {
+  if (!aiManager) {
+    return 'AI管理器未初始化，请检查配置。';
+  }
+  return await aiManager.getAIResponse(message, options);
   try {
     // 检查API密钥是否配置
     if (!config.openai.apiKey || config.openai.apiKey === 'your-api-key-here') {
@@ -278,6 +334,7 @@ let accountManager = null;
 let authManager = null;
 let playerTracker = null;
 let reconnectManager = null;
+let aiManager = null; // AI管理器
 let isConnected = false; // 跟踪bot连接状态
 let lastPlayerCount = 0; // 上次玩家数量
 let emptyPlayerListCount = 0; // 玩家列表为空的次数
@@ -414,6 +471,12 @@ function createBot() {
   // 如果已有bot，先结束
   if (bot) {
     bot.end();
+  }
+
+  // 确保配置存在
+  if (!config.server) {
+    console.error('[ERROR] 服务器配置缺失，请检查config.json文件');
+    return;
   }
 
   // 获取当前账户
@@ -1345,6 +1408,15 @@ function forceUpdatePlayerList() {
 // 初始化账户管理器
 accountManager = new AccountManager(config);
 
+// 初始化AI管理器
+aiManager = new AIManager(config);
+console.log('[AI] AI管理器已初始化，支持平台:', aiManager.getSupportedPlatforms().join(', '));
+
+// 初始化重连管理器
+reconnectManager = new ReconnectManager(config, createBot);
+if (config.reconnect && config.reconnect.enabled) {
+  reconnectManager.enableReconnect();
+}
 // 初始化重连管理器
 reconnectManager = new ReconnectManager(config, createBot);
 if (config.reconnect && config.reconnect.enabled) {
