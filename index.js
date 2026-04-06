@@ -5,6 +5,7 @@ const axios = require('axios');
 const express = require('express');
 const http = require('http');
 const { Server } = require('socket.io');
+const WebSocket = require('ws');
 const testmode = process.argv.includes('--test');
 
 // 导入自定义模块
@@ -13,6 +14,171 @@ const AuthManager = require('./auth');
 const PlayerTracker = require('./playerTracker');
 const ReconnectManager = require('./reconnect');
 const AIManager = require('./aiManager');
+
+// IRC客户端类
+class IRCClient {
+    constructor(config) {
+        this.config = config;
+        this.apiUrl = `http://${config.server}${config.apiPath}`;
+        this.wsUrl = config.wsPath;
+        this.botName = config.botName;
+        this.apiKey = config.apiKey;
+        this.ws = null;
+        this.connected = false;
+    }
+    
+    // 注册bot
+    async register() {
+        try {
+            const response = await axios.post(this.apiUrl, {
+                action: 'register',
+                bot_name: this.botName,
+                owner_name: config.player.owner,
+                server: `${config.server.host}:${config.server.port}`,
+                player_name: config.player.username
+            });
+            
+            if (response.data.success) {
+                this.apiKey = response.data.api_key;
+                // 保存apiKey到配置文件
+                config.irc.apiKey = this.apiKey;
+                fs.writeFileSync(testmode ? '.test.config.json' : 'config.json', JSON.stringify(config, null, 2));
+                console.log('[IRC] Bot注册成功');
+                return true;
+            } else {
+                console.error('[IRC] Bot注册失败:', response.data.error);
+                return false;
+            }
+        } catch (error) {
+            console.error('[IRC] 注册错误:', error.message);
+            return false;
+        }
+    }
+    
+    // 检查bot名称是否可用
+    async checkBotName() {
+        try {
+            const response = await axios.get(this.apiUrl, {
+                params: {
+                    action: 'check_bot_name',
+                    bot_name: this.botName
+                }
+            });
+            
+            if (response.data.success) {
+                return response.data.available;
+            }
+            return false;
+        } catch (error) {
+            console.error('[IRC] 检查bot名称错误:', error.message);
+            return false;
+        }
+    }
+    
+    // 更新状态
+    async updateStatus(online) {
+        if (!this.apiKey) return;
+        
+        try {
+            await axios.post(this.apiUrl, {
+                action: 'update_status',
+                api_key: this.apiKey,
+                online: online,
+                player_name: config.player.username
+            });
+        } catch (error) {
+            console.error('[IRC] 更新状态错误:', error.message);
+        }
+    }
+    
+    // 连接WebSocket
+    connectWebSocket() {
+        if (!this.apiKey) return;
+        
+        this.ws = new WebSocket(this.wsUrl);
+        
+        this.ws.on('open', () => {
+            console.log('[IRC] WebSocket连接成功');
+            this.connected = true;
+            // 注册bot
+            this.ws.send(JSON.stringify({
+                action: 'register_bot',
+                bot_name: this.botName,
+                api_key: this.apiKey
+            }));
+        });
+        
+        this.ws.on('message', (data) => {
+            try {
+                const message = JSON.parse(data);
+                if (message.type === 'message') {
+                    // 接收IRC消息
+                    this.handleIRCMessage(message);
+                }
+            } catch (error) {
+                console.error('[IRC] 解析消息错误:', error.message);
+            }
+        });
+        
+        this.ws.on('close', () => {
+            console.log('[IRC] WebSocket连接关闭');
+            this.connected = false;
+            // 重连
+            setTimeout(() => this.connectWebSocket(), 5000);
+        });
+        
+        this.ws.on('error', (error) => {
+            console.error('[IRC] WebSocket错误:', error.message);
+        });
+    }
+    
+    // 发送IRC消息
+    sendMessage(message) {
+        if (!this.connected || !this.apiKey) return;
+        
+        this.ws.send(JSON.stringify({
+            action: 'send_message',
+            bot_name: this.botName,
+            sender: config.player.owner,
+            message: message
+        }));
+    }
+    
+    // 处理IRC消息
+    handleIRCMessage(message) {
+        // 显示在控制台
+        console.log(`[IRC] ${message.bot_name} (${message.sender}): ${message.message}`);
+        
+        // 发送到游戏内聊天
+        if (bot) {
+            bot.chat(`[IRC] ${message.bot_name}: ${message.message}`);
+        }
+        
+        // 发送到Web界面
+        if (io) {
+            io.emit('irc_message', message);
+        }
+    }
+    
+    // 获取在线bot列表
+    async getOnlineBots() {
+        try {
+            const response = await axios.get(this.apiUrl, {
+                params: {
+                    action: 'get_bots'
+                }
+            });
+            
+            if (response.data.success) {
+                return response.data.bots;
+            }
+            return [];
+        } catch (error) {
+            console.error('[IRC] 获取在线bot错误:', error.message);
+            return [];
+        }
+    }
+}
 
 // 读取配置文件 若包含 --test 参数则使用测试配置
 const configFile = testmode ? '.test.config.json' : 'config.json';
@@ -224,8 +390,8 @@ if (!config.web) {
 }
 
 if (config.web.port ? config.web.port : -1 === -1) {
-  console.log('[StarBotMC] Web服务器端口未配置 (web.port), 已设置为 25560');
-  config.web.port = 25560;
+  console.log('[StarBotMC] Web服务器端口未配置 (web.port), 已设置为 3081');
+  config.web.port = 3081;
 }
 if (config.web.host ? config.web.host : -1 === -1) {
   console.log('[StarBotMC] Web服务器主机未配置 (web.host), 已设置为 0.0.0.0');
@@ -348,6 +514,7 @@ let authManager = null;
 let playerTracker = null;
 let reconnectManager = null;
 let aiManager = null; // AI管理器
+let ircClient = null; // IRC客户端
 let isConnected = false; // 跟踪bot连接状态
 let lastPlayerCount = 0; // 上次玩家数量
 let emptyPlayerListCount = 0; // 玩家列表为空的次数
@@ -575,6 +742,20 @@ function webCmd(message, whisper=false, sender='') {
         }
         return 1;
       } else {bot.chat(`/minecraft:tell ${sender} 你没有权限！`);}
+    case '.i':
+      // IRC消息指令
+      if (isOwner && whisper) {
+        const ircMessage = message.split(' ').slice(1).join(' ');
+        if (ircMessage) {
+          if (ircClient) {
+            ircClient.sendMessage(ircMessage);
+            bot.chat(`[IRC] 已发送消息: ${ircMessage}`);
+          } else {
+            bot.chat('[IRC] IRC客户端未初始化');
+          }
+        }
+        return 1;
+      } else {bot.chat(`/minecraft:tell ${sender} 你没有权限！`);}
     default:
       if (isOwner && whisper) {
         io.emit('chat_message', {
@@ -614,6 +795,10 @@ function setupBotEvents() {
     if (reconnectManager) {
       reconnectManager.onReconnectSuccess();
     }
+    // 更新IRC状态
+    if (ircClient) {
+      ircClient.updateStatus(true);
+    }
   });
 
   // 错误事件
@@ -652,6 +837,10 @@ function setupBotEvents() {
     }
     if (reconnectManager) {
       reconnectManager.handleDisconnect(reason);
+    }
+    // 更新IRC状态
+    if (ircClient) {
+      ircClient.updateStatus(false);
     }
   });
 
@@ -1465,6 +1654,29 @@ setInterval(() => {
   updatePlayerList();
   updateInventory();
 }, 10000); // 每10秒更新一次
+
+// 初始化IRC客户端
+if (config.irc && config.irc.enabled) {
+  console.log('[IRC] 正在初始化IRC客户端...');
+  ircClient = new IRCClient(config.irc);
+  
+  // 检查bot名称是否可用
+  (async () => {
+    const nameAvailable = await ircClient.checkBotName();
+    if (!nameAvailable) {
+      console.error('[IRC] Bot名称已被使用，无法启动');
+      process.exit(1);
+    }
+    
+    // 注册bot
+    if (!config.irc.apiKey) {
+      await ircClient.register();
+    }
+    
+    // 连接WebSocket
+    ircClient.connectWebSocket();
+  })();
+}
 
 // 创建初始bot
 console.log('Minecraft AI机器人已启动，正在连接到服务器...');
