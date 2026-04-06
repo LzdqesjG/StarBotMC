@@ -1,0 +1,113 @@
+{
+  "server": {
+    "version": "1.21.1",                  
+    "host": "jackal.openrealm.cn",        
+    "port": 25565                          
+  },
+  "player": {
+    "username": "Lzdqesj_bot1",
+    "owner": "Lzdqesj_"
+  },
+  "accounts": [
+    {
+      "username": "Lzdqesj_bot1",
+      "owner": "Lzdqesj_"
+    },
+    {
+      "username": "Lzdqesj_bot2",
+      "owner": "Lzdqesj_"
+    }
+  ],
+  "currentAccountIndex": 0,
+  "auth": {
+    "autoLogin": true,                    
+    "autoRegister": true,                 
+    "password": "lzd112233",   
+    "loginCommand": "/login",         
+    "registerCommand": "/register"       
+  },
+  "reconnect": {
+    "enabled": true,
+    "maxReconnectAttempts": 10,
+    "reconnectDelay": 5000
+  },
+  "playerCheckInterval": 10000,
+  "playerAlerts": {
+    "Lzdqesj_": {
+      "message": "欢迎主人 Lzdqesj_ 上线！",    
+      "leaveMessage": "主人 Lzdqesj_ 下线了，本 Bot 将持续挂机！",
+      "command": "/minecraft:tell Lzdqesj_ 我在线了！",
+      "delay": 2000
+    }
+  },
+  "ai": {
+    "defaultPlatform": "openai",
+    "openai": {
+      "apiUrl": "https://api.openai.com/v1/chat/completions",
+      "model": "gpt-3.5-turbo",
+      "apiKey": "your_openai_api_key_here"
+    },
+    "claude": {
+      "apiUrl": "https://api.anthropic.com/v1/messages",
+      "model": "claude-3-sonnet-20240229",
+      "apiKey": "your_claude_api_key_here"
+    },
+    "gemini": {
+      "apiUrl": "https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent",
+      "model": "gemini-pro",
+      "apiKey": "your_gemini_api_key_here"
+    },
+    "ollama": {
+      "apiUrl": "http://localhost:11434/api/chat",
+      "model": "llama2",
+      "apiKey": "ollama" 
+    },
+    "qwen": {
+      "apiUrl": "https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation",
+      "model": "qwen-max",
+      "apiKey": "your_qwen_api_key_here"
+    },
+    "moonshot": {
+      "apiUrl": "https://api.moonshot.cn/v1/chat/completions",
+      "model": "moonshot-v1-8k",
+      "apiKey": "your_moonshot_api_key_here"
+    },
+    "zhipu": {
+      "apiUrl": "https://open.bigmodel.cn/api/paas/v4/chat/completions",
+      "model": "glm-4",
+      "apiKey": "your_zhipu_api_key_here"
+    },
+    "baichuan": {
+      "apiUrl": "https://api.baichuan-ai.com/v1/chat/completions",
+      "model": "Baichuan2-Turbo",
+      "apiKey": "your_baichuan_api_key_here"
+    },
+    "minimax": {
+      "apiUrl": "https://api.minimaxi.chat/v1/text/chatcompletion_pro",
+      "model": "abab5.5-chat",
+      "apiKey": "your_minimax_api_key_here"
+    }
+  },
+  "signin": {
+    "enabled": true,
+    "command": "/signin"
+  },
+  "startupCommands": [
+    "/login lzd112233",
+    "StarBotMC 已登录到服务器。",
+    "/minecraft:me 获取同款挂机 Bot,",
+    "/minecraft:me 请发送消息\".github\"!"
+  ],
+  "web": {
+    "password": "r3f3r蛙ruiyywfkiflkj iufgasuiwei waeriluyawre \\/m'./;k/.;kl,kl;/k,kl//,.'.kl/;i,p[[/,jh34324y234fl9",
+    "port": 3081,
+    "host": "0.0.0.0"          
+  },
+  "irc": {
+    "enabled": true,
+    "server": "test.cyrene.wiki",
+    "apiPath": "/StarBotMC/api.php",
+    "botName": "Lzdqesj_bot1",
+    "apiKey": ""  
+  }
+}
