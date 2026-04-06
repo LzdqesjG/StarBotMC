@@ -1,4 +1,4 @@
-c:\Users\Administrator\Documents\GitHub\StarBotMC\README.md
+
 <!-- https://github.com/LzdqesjG/StarBotMC -->
 <div align="center">
   <!-- <img style="width: 128px; height: 128px;" src="" alt="logo" /> -->
