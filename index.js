@@ -95,10 +95,19 @@ console.log('[StarBotMC] StarCore 初始化完成。即将初始化 StarBot ...'
 
 io.on('connection', (socket) => {
   console.log('[WebUI] 网页客户端已连接');
+  socket.emit("verify_init",(config.captha.enabled) ? config.captha.sitekey : "no open");
   
   // 处理登录请求
-  socket.on('login', (password) => {
+  socket.on('login', (password,token) => {
     if (password === config.web.password) {
+      if (config.captha.enabled){
+        let res = axios.post("https://challenges.cloudflare.com/turnstile/v0/siteverify",{"secret":config.captha.secret,"response":token},{"headers":{"Content-Type":"application/json"}});//这是个异步api，我假装它是同步的
+        if (!res.success){
+        socket.emit('login_result', { success: false, message: '验证码错误' });
+      console.log('[WebUI] 用户登录失败：验证码错误');
+          return;
+        }
+      }
       authenticatedSockets.add(socket.id);
       socket.emit('login_result', { success: true });
       console.log('[WebUI] 用户登录成功');
