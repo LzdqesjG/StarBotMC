@@ -125,7 +125,7 @@ io.on('connection', (socket) => {
       socket.emit('error', '请先登录');
       return;
     };
-    
+    message=String(message);
     console.log(`[WebUI] 网页发送消息: ${message}`);
     if (bot) {
       // 检查是否是命令
