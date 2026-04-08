@@ -260,12 +260,16 @@ bash start.sh
 ```json
 {
   "web": {
-    "password": "your_web_password_here"
+      "password": "your_web_password_here",
+    "port": 3081,
+    "host": "0.0.0.0"          
   }
 }
 ```
 
 - `password` - Web 控制面板登录密码
+- `port` - web控制台端口
+- `host` - 监听的IP(默认监听所有ip即0.0.0.0)
 
 ### 启动命令配置
 
@@ -301,6 +305,9 @@ bash start.sh
 
 启动机器人后，在浏览器中访问：
 
-```plaintext
-http://localhost:3081
-```
+127.0.0.1:web.port
+
+或
+
+localhost:web.port
+(web.port为配置文件里的值，默认25560)
