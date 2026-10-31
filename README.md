@@ -13,6 +13,7 @@
 
 一个功能强大的基于 Node.js 和 mineflayer 的 Minecraft AI 机器人，支持多账户管理、自动登录、玩家追踪、Web 控制面板和 AI 聊天功能。
 
+更多信息,请访问我们的官网<a href="https://starbotmc.dpdns.org/">starbotmc.dpdns.org</a>
 ## 功能特性
 
 - 多账户管理 - 支持管理多个机器人账户，可随时切换
